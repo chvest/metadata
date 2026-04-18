@@ -1,0 +1,806 @@
+{% extends "base.html" %}
+{% block title %}Methodology — NATO Metadata Standards Tool{% endblock %}
+
+{% block extra_head %}
+<style>
+.method-section { border-left: 4px solid #003189; padding-left: 1.25rem; margin-bottom: 2.5rem; }
+.method-section h3 { color: #003189; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+.step-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: #003189; color: #fff; font-weight: 700;
+  font-size: 0.8rem; flex-shrink: 0; margin-right: 0.5rem;
+}
+.callout { border-radius: 6px; padding: 0.9rem 1.1rem; margin: 0.75rem 0; }
+.callout-info    { background: #e8edf8; border-left: 4px solid #003189; }
+.callout-warn    { background: #fff8e1; border-left: 4px solid #ffc107; }
+.callout-limit   { background: #f8f9fa; border-left: 4px solid #6c757d; }
+.mapping-exact   { color: #198754; font-weight: 600; }
+.mapping-similar { color: #0d6efd; font-weight: 600; }
+.mapping-partial { color: #fd7e14; font-weight: 600; }
+.mapping-none    { color: #adb5bd; font-weight: 600; }
+.toc a { text-decoration: none; color: #003189; font-size: 0.9rem; }
+.toc a:hover { text-decoration: underline; }
+.stat-box {
+  background: #f0f4ff; border-radius: 8px; padding: 0.75rem 1rem;
+  text-align: center;
+}
+.stat-box .num { font-size: 1.8rem; font-weight: 700; color: #003189; }
+.stat-box .lbl { font-size: 0.75rem; color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:860px;">
+
+  <h1 class="fw-bold mb-1">Methodology</h1>
+  <p class="text-muted mb-4">
+    How comparisons between metadata standards are made in this tool —
+    written for a reader who wants to understand, replicate, or critique the approach.
+  </p>
+
+  {# ── Stats bar ────────────────────────────────────────────────────────── #}
+  <div class="row g-3 mb-5">
+    <div class="col-6 col-md-3">
+      <div class="stat-box">
+        <div class="num">{{ stats.n_standards }}</div>
+        <div class="lbl">Standards covered</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-box">
+        <div class="num">{{ stats.n_crosswalk_entries }}</div>
+        <div class="lbl">Crosswalk entries</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-box">
+        <div class="num">{{ stats.n_directed_pairs }}</div>
+        <div class="lbl">Directed pairs mapped</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-box">
+        <div class="num">{{ stats.n_manual_conflicts }}</div>
+        <div class="lbl">Hand-coded conflicts</div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Table of contents ────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-5">
+    <div class="card-body py-3">
+      <div class="fw-semibold small text-uppercase text-muted mb-2">Contents</div>
+      <ol class="toc mb-0" style="columns:2; column-gap:2rem;">
+        <li><a href="#sec-overview">Overview</a></li>
+        <li><a href="#sec-field-mapping">Field mapping (crosswalk)</a></li>
+        <li><a href="#sec-scores">Compatibility scores</a></li>
+        <li><a href="#sec-conflicts">Conflict identification</a></li>
+        <li><a href="#sec-verdict">Interoperability verdict</a></li>
+        <li><a href="#sec-roundtrip">Round-trip fidelity</a></li>
+        <li><a href="#sec-paths">Conversion paths</a></li>
+        <li><a href="#sec-evidence">Evidence basis</a></li>
+        <li><a href="#sec-limitations">Limitations</a></li>
+        <li><a href="#sec-replication">Replication guide</a></li>
+        <li><a href="#sec-literature">Related academic literature</a></li>
+      </ol>
+    </div>
+  </div>
+
+  {# ═══════════════════ 1. OVERVIEW ═══════════════════ #}
+  <div class="method-section" id="sec-overview">
+    <h3>1. Overview</h3>
+    <p>
+      This tool assesses interoperability between metadata standards by asking a concrete question:
+      <em>if you have a metadata record conforming to standard A, how much of it can be
+      expressed in standard B, and what is lost or degraded in the translation?</em>
+    </p>
+    <p>
+      The assessment has three layers, applied independently:
+    </p>
+    <ol>
+      <li><strong>Field-level crosswalk</strong> — for each field in standard A, is there a semantically
+          equivalent field in standard B?</li>
+      <li><strong>Conflict analysis</strong> — are there structural, vocabulary, or obligation
+          incompatibilities that would prevent a fully conformant record from surviving
+          the conversion intact?</li>
+      <li><strong>Derived metrics</strong> — compatibility scores, round-trip fidelity, and
+          conversion paths are all computed mechanically from the crosswalk and conflict data.</li>
+    </ol>
+    <div class="callout callout-info">
+      The tool does <strong>not</strong> perform automated parsing or comparison of the standard
+      documents themselves. The crosswalk and conflict data were built by reading each standard's
+      field definitions and hand-coding the semantic relationships. All derived outputs
+      (scores, verdicts, round-trip traces) are computed deterministically from that data.
+    </div>
+  </div>
+
+  {# ═══════════════════ 2. FIELD MAPPING ═══════════════════ #}
+  <div class="method-section" id="sec-field-mapping">
+    <h3>2. Field mapping (crosswalk)</h3>
+    <p>
+      For each directed pair of standards (A→B), every field in A is examined and assigned
+      one of four mapping types:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr>
+          <th style="width:12%">Type</th>
+          <th style="width:44%">Definition</th>
+          <th>Example</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mapping-exact">exact</span></td>
+          <td>The fields share the same semantic meaning, the same data type, and compatible
+              cardinality. A value can be transferred without modification.</td>
+          <td>ADatP-5636 <code>title</code> → Dublin Core <code>dc:title</code></td>
+        </tr>
+        <tr>
+          <td><span class="mapping-similar">similar</span></td>
+          <td>The fields share the same core meaning but differ in structure, encoding,
+              or cardinality in a way that requires minor adaptation but preserves the
+              essential information.</td>
+          <td>ADatP-5636 <code>creator</code> (structured PointOfContact) →
+              Dublin Core <code>dc:creator</code> (free text) — same concept, different encoding</td>
+        </tr>
+        <tr>
+          <td><span class="mapping-partial">partial</span></td>
+          <td>The target field covers the same broad concept but only partially expresses
+              the source field's semantics — either because the target is more generic,
+              or because multiple source fields compete for the same target slot.</td>
+          <td>ADatP-5636 <code>dateCreated</code>, <code>dateIssued</code>, and
+              <code>dateModified</code> all map to <code>dc:date</code> — information
+              about which date is which is lost</td>
+        </tr>
+        <tr>
+          <td><span class="mapping-none">none</span></td>
+          <td>No equivalent field exists in the target standard. The source field has
+              no semantic home in the target namespace.</td>
+          <td>ADatP-5636 <code>metadataConfidentialityLabel</code> →
+              Dublin Core (no equivalent)</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="small text-muted mb-2">
+      Current breakdown across all {{ stats.n_crosswalk_entries }} crosswalk entries:
+    </p>
+    <div class="d-flex gap-2 flex-wrap mb-3">
+      <span class="badge px-2 py-1" style="background:#198754;color:#fff;">
+        {{ stats.mapping_counts.get('exact', 0) }} exact
+      </span>
+      <span class="badge px-2 py-1" style="background:#0d6efd;color:#fff;">
+        {{ stats.mapping_counts.get('similar', 0) }} similar
+      </span>
+      <span class="badge px-2 py-1" style="background:#fd7e14;color:#fff;">
+        {{ stats.mapping_counts.get('partial', 0) }} partial
+      </span>
+      <span class="badge px-2 py-1" style="background:#adb5bd;color:#212529;">
+        {{ stats.mapping_counts.get('none', 0) }} none
+      </span>
+    </div>
+
+    <h5 class="fw-semibold" style="font-size:0.95rem;">How mapping decisions were made</h5>
+    <p>Each mapping was determined by the following process:</p>
+    <ol style="font-size:0.9rem;">
+      <li>Read the field definition (name, description, representation term, cardinality,
+          allowed values) from the source standard's normative text.</li>
+      <li>Identify candidate fields in the target standard with overlapping semantic intent.</li>
+      <li>Compare representation terms (e.g. <code>Text</code> vs <code>PointOfContact</code>),
+          cardinality constraints (one vs many), and controlled vocabulary compatibility.</li>
+      <li>Assign a mapping type based on the criteria above.</li>
+      <li>Record any semantic differences in the <em>notes</em> field.</li>
+    </ol>
+    <p>
+      Mappings are <strong>directional</strong>. A→B and B→A are assessed separately.
+      The reverse crosswalk is not assumed to be the mirror image of the forward one —
+      a target standard may have fields that map back to different source fields, or to none at all.
+    </p>
+    <div class="callout callout-warn">
+      <strong>Inferred reverse mappings:</strong> When computing round-trip fidelity,
+      if no explicit B→A crosswalk entry exists for a field, a reverse entry is <em>inferred</em>
+      from the A→B entry (same mapping type, same fields in reverse). This means round-trip
+      scores for pairs without a hand-coded reverse crosswalk are approximate. Inferred
+      entries are marked as such in the source code.
+    </div>
+  </div>
+
+  {# ═══════════════════ 3. SCORES ═══════════════════ #}
+  <div class="method-section" id="sec-scores">
+    <h3>3. Compatibility scores</h3>
+    <p>
+      The compatibility score for a directed pair A→B is defined as:
+    </p>
+    <div class="card border-0 bg-light p-3 mb-3 text-center" style="font-size:1rem;">
+      <strong>score(A→B) = |{fields in A with a non-<em>none</em> mapping to B}| ÷ |{all fields in A}|</strong>
+    </div>
+    <p>
+      This gives the fraction of A's fields that have <em>some</em> representation in B.
+      It does not weight by importance, obligation level, or mapping quality —
+      a <em>partial</em> mapping contributes the same as an <em>exact</em> one.
+    </p>
+    <div class="callout callout-warn">
+      <strong>Scores are not symmetric.</strong> score(A→B) and score(B→A) measure different
+      things: how much of A survives in B, and how much of B survives in A. A high score
+      in one direction does not imply a high score in the other. This asymmetry is
+      intentional and expected — for example, a simple standard will often score higher
+      when sending <em>to</em> a complex standard (fewer fields to map) than when receiving
+      <em>from</em> one (many incoming fields have no home).
+    </div>
+    <p>
+      <strong>What scores do not capture:</strong>
+    </p>
+    <ul style="font-size:0.9rem;">
+      <li>Whether mandatory fields specifically survive (a score of 40% could mean all
+          mandatory fields map, or none of them do)</li>
+      <li>The quality of mappings (exact vs partial are counted equally)</li>
+      <li>Value-level compatibility — two fields may both be called <em>language</em>
+          but use different controlled vocabularies</li>
+    </ul>
+    <p>
+      For a fuller picture, use the <a href="{{ url_for('pairwise_select') }}">pairwise comparison</a>
+      which shows mandatory-field-specific coverage and the conflict analysis alongside the score.
+    </p>
+  </div>
+
+  {# ═══════════════════ 4. CONFLICTS ═══════════════════ #}
+  <div class="method-section" id="sec-conflicts">
+    <h3>4. Conflict identification</h3>
+    <p>
+      Conflicts are interoperability problems that go beyond "the field doesn't exist in the target."
+      They fall into two categories:
+    </p>
+
+    <h5 class="fw-semibold" style="font-size:0.95rem;">4.1 Hand-coded conflicts</h5>
+    <p>
+      {{ stats.n_manual_conflicts }} conflicts were identified through careful reading of
+      both standards' normative texts and manually coded. Each covers a specific structural
+      or semantic incompatibility that would not be apparent from the field mapping alone.
+    </p>
+
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr><th>Conflict type</th><th>Count</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mandatory_gap</code></td>
+          <td>{{ stats.conflict_type_counts.get('mandatory_gap', 0) }}</td>
+          <td>A field that is mandatory in the source has no mapping to the target —
+              identified manually where the consequences are particularly significant
+              (e.g. the security classification label).</td>
+        </tr>
+        <tr>
+          <td><code>vocabulary</code></td>
+          <td>{{ stats.conflict_type_counts.get('vocabulary', 0) }}</td>
+          <td>Source and target fields share the same concept but use incompatible
+              controlled vocabularies or encoding schemes. Values cannot be transferred
+              without a lookup table or transformation.</td>
+        </tr>
+        <tr>
+          <td><code>obligation_inversion</code></td>
+          <td>{{ stats.conflict_type_counts.get('obligation_inversion', 0) }}</td>
+          <td>A field that is mandatory in the target has no guaranteed equivalent in
+              the source — source records may arrive with the required field missing.</td>
+        </tr>
+        <tr>
+          <td><code>structural</code></td>
+          <td>{{ stats.conflict_type_counts.get('structural', 0) }}</td>
+          <td>A fundamental structural feature of one standard (e.g. a multi-layer
+              security model) has no architectural analogue in the other.</td>
+        </tr>
+        <tr>
+          <td><code>domain_mismatch</code></td>
+          <td>{{ stats.conflict_type_counts.get('domain_mismatch', 0) }}</td>
+          <td>Two fields appear to map by name or concept but serve different purposes
+              in their respective domains; a mapping would produce misleading results.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h5 class="fw-semibold" style="font-size:0.95rem;">4.2 Auto-detected conflicts</h5>
+    <p>
+      In addition to hand-coded conflicts, the tool automatically detects
+      <strong>mandatory gap</strong> conflicts: any field that is marked <em>mandatory</em>
+      in the source standard and has no crosswalk entry (or a <em>none</em> entry) in the
+      target is flagged as a blocking conflict. These are labelled
+      <span class="badge bg-secondary" style="font-size:0.72rem;">auto-detected</span>
+      throughout the interface.
+    </p>
+    <div class="callout callout-info">
+      <strong>Avoiding double-counting:</strong> If a mandatory field is already covered by
+      a hand-coded conflict, the auto-detector skips it to avoid duplicates. Hand-coded
+      entries take precedence and typically provide richer explanatory text.
+    </div>
+
+    <h5 class="fw-semibold" style="font-size:0.95rem;">4.3 Severity levels</h5>
+    <div class="row g-3 mb-2">
+      <div class="col-md-4">
+        <div class="rounded p-3 h-100" style="background:#fde8ea;border-left:4px solid #dc3545;">
+          <div class="fw-bold mb-1" style="color:#842029;font-size:0.88rem;">&#9940; Blocking</div>
+          <p class="small mb-0">A conformant source record <strong>cannot be made fully conformant</strong>
+          in the target without discarding a mandatory field or fabricating a value.
+          The receiver may parse the file but it will <strong>fail validation</strong>
+          against the target standard.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="rounded p-3 h-100" style="background:#fff8e1;border-left:4px solid #ffc107;">
+          <div class="fw-bold mb-1" style="color:#664d03;font-size:0.88rem;">&#9888; Lossy</div>
+          <p class="small mb-0">Conversion is possible and the record will pass target
+          validation, but <strong>some information is permanently degraded</strong>.
+          The lost structure or precision cannot be recovered on the return trip.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="rounded p-3 h-100" style="background:#e0f4fb;border-left:4px solid #0dcaf0;">
+          <div class="fw-bold mb-1" style="color:#055160;font-size:0.88rem;">&#8635; Transform required</div>
+          <p class="small mb-0">Fully interoperable, but only after a
+          <strong>specific, well-defined transformation</strong> is applied.
+          No information is permanently lost if the transformation is correctly implemented.</p>
+        </div>
+      </div>
+    </div>
+    <p class="small text-muted mt-2">
+      Severity is assigned manually for hand-coded conflicts based on the operational
+      consequence of the incompatibility. For auto-detected mandatory gaps, severity is
+      always <em>blocking</em> (a mandatory field with no mapping cannot be preserved).
+    </p>
+  </div>
+
+  {# ═══════════════════ 5. VERDICT ═══════════════════ #}
+  <div class="method-section" id="sec-verdict">
+    <h3>5. Interoperability verdict</h3>
+    <p>
+      The verdict synthesises the score and conflict data into a single label for each pair.
+      It is computed by the following decision tree, applied in order:
+    </p>
+    <ol style="font-size:0.9rem;">
+      <li><strong>Same suite</strong> — if both standards belong to the same suite
+          (i.e. are explicitly designed to work together), the verdict is
+          <em>"Designed to work together"</em> regardless of score or conflicts.</li>
+      <li><strong>Highly interoperable</strong> — no blocking conflicts, no lossy conflicts,
+          and the weaker directional score ≥ 50%.</li>
+      <li><strong>Interoperable with transformation</strong> — no blocking or lossy conflicts,
+          but transform-required conflicts exist or the weaker score ≥ 25%.</li>
+      <li><strong>Partial data loss</strong> — lossy conflicts exist but no blocking conflicts.</li>
+      <li><strong>Not fully interoperable</strong> — blocking conflicts exist,
+          or the stronger directional score &lt; 25%.</li>
+    </ol>
+    <div class="callout callout-warn">
+      The verdict is a coarse summary. A pair can receive "Not fully interoperable" even if
+      95% of fields convert perfectly — one blocking conflict is sufficient. Always read the
+      conflict detail to understand <em>which</em> fields are affected and whether they are
+      relevant to your use case.
+    </div>
+  </div>
+
+  {# ═══════════════════ 6. ROUND-TRIP ═══════════════════ #}
+  <div class="method-section" id="sec-roundtrip">
+    <h3>6. Round-trip fidelity</h3>
+    <p>
+      Round-trip fidelity simulates what happens to each field in standard A if a record
+      is converted A→B and then converted back B→A. For each field, the tool traces
+      two legs:
+    </p>
+    <ol style="font-size:0.9rem;">
+      <li><strong>Leg 1 (A→B):</strong> Look up the A→B crosswalk entry for this field.</li>
+      <li><strong>Leg 2 (B→A):</strong> If leg 1 found a target field in B, look up the
+          B→A crosswalk entry for that B field.</li>
+    </ol>
+    <p>The outcome for each field is classified as:</p>
+    <ul style="font-size:0.9rem;">
+      <li><strong>Survives</strong> — both legs are <em>exact</em> or <em>similar</em>.
+          The field comes back with the same semantic content.</li>
+      <li><strong>Degraded</strong> — at least one leg is <em>partial</em>.
+          The field returns but with reduced precision or structure.</li>
+      <li><strong>Lost</strong> — leg 1 maps to <em>none</em>, or leg 1's target field
+          has no reverse mapping in leg 2.</li>
+    </ul>
+    <div class="callout callout-warn">
+      <strong>Inferred reverse legs:</strong> Where no explicit B→A crosswalk entry
+      exists, the reverse is inferred by treating the A→B entry backwards (same field
+      names, same mapping type). This means the round-trip result for asymmetric pairs
+      is an approximation — it assumes the gateway system would use the same field for
+      both directions, which may not hold in practice.
+    </div>
+  </div>
+
+  {# ═══════════════════ 7. CONVERSION PATHS ═══════════════════ #}
+  <div class="method-section" id="sec-paths">
+    <h3>7. Conversion paths</h3>
+    <p>
+      Conversion path analysis answers the question: <em>can standard A reach standard C,
+      either directly or via an intermediate standard B?</em>
+    </p>
+    <p>
+      A directed edge exists from standard X to standard Y if at least one non-<em>none</em>
+      crosswalk entry exists in the X→Y direction. The tool finds:
+    </p>
+    <ul style="font-size:0.9rem;">
+      <li><strong>Direct paths</strong> (one hop): A→C</li>
+      <li><strong>One-intermediate paths</strong> (two hops): A→B→C for every B in the
+          set of standards</li>
+    </ul>
+    <p>
+      Each path is scored by the <strong>weakest leg</strong> — the minimum of the
+      compatibility scores for each hop. This "bottleneck fidelity" reflects the
+      real-world constraint that a chain is only as strong as its weakest link.
+    </p>
+    <p>
+      Paths are rated: <span style="color:#198754;font-weight:600;">good</span> (≥ 40%),
+      <span style="color:#fd7e14;font-weight:600;">fair</span> (≥ 20%), or
+      <span style="color:#dc3545;font-weight:600;">poor</span> (&lt; 20%).
+    </p>
+    <div class="callout callout-limit">
+      Paths of more than two hops are not computed. In practice, each conversion hop
+      compounds information loss, making three-hop paths rarely useful even if they exist.
+    </div>
+  </div>
+
+  {# ═══════════════════ 8. EVIDENCE BASIS ═══════════════════ #}
+  <div class="method-section" id="sec-evidence">
+    <h3>8. Evidence basis</h3>
+    <p>
+      Each standard pair is assigned one of three evidence levels depending on
+      whether authoritative published crosswalk documentation exists:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr><th style="width:20%">Level</th><th>Meaning</th><th>Examples</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge" style="background:#198754;color:#fff;">Normative</span></td>
+          <td>The mapping is defined <em>by</em> one of the standards themselves —
+              no interpretation is required.</td>
+          <td>DCAT-AP ↔ Dublin Core (DCAT-AP uses the <code>dct:</code> namespace
+              throughout its own specification); INSPIRE ↔ ISO 19115
+              (INSPIRE TG Annex C maps every element to ISO 19115 by clause)</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#0d6efd;color:#fff;">Published</span></td>
+          <td>An authoritative body has published a crosswalk document that defines
+              the mapping, though it is external to the standards themselves.</td>
+          <td>DCAT-AP / INSPIRE ↔ ISO 19115 via
+              <a href="https://semiceu.github.io/GeoDCAT-AP/releases/2.0.0/"
+                 target="_blank" rel="noopener">GeoDCAT-AP 2.0.0</a>
+              (EU ISA² programme, Appendix B)</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#6c757d;color:#fff;">Assessment</span></td>
+          <td>No public crosswalk exists. The mapping is based on our own semantic
+              analysis of the field definitions in both standards.</td>
+          <td>All pairs involving ADatP-5636 — NATO NSO documents are access-restricted
+              and no public crosswalk has been published</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p>
+      The evidence level is shown on every pairwise comparison page and in every
+      compatibility report. Findings with only an <em>assessment</em> basis should
+      be treated as indicative — they represent informed judgement, not normative fact.
+    </p>
+    <p>
+      Source links and relevant section references are provided throughout the tool
+      so that every claim can be checked against the primary documents.
+    </p>
+  </div>
+
+  {# ═══════════════════ 9. LIMITATIONS ═══════════════════ #}
+  <div class="method-section" id="sec-limitations">
+    <h3>9. Limitations</h3>
+    <p>The following aspects are <strong>out of scope</strong> for this tool:</p>
+    <ul style="font-size:0.9rem;">
+      <li>
+        <strong>Value-level validation</strong> — the tool checks whether a field
+        <em>has a mapping</em>, not whether a specific value in that field would
+        survive conversion. For example, a NATO security classification value
+        ("NATO SECRET") has no equivalent in Dublin Core's <code>dc:rights</code>
+        free-text field, but this is only partially captured in the conflict notes,
+        not enforced at record validation time.
+      </li>
+      <li>
+        <strong>Implementation correctness</strong> — the tool assesses conceptual
+        interoperability between the specifications. Whether a specific software
+        system correctly implements that specification is a separate question.
+      </li>
+      <li>
+        <strong>Profiles and extensions</strong> — many standards are deployed as
+        profiles (e.g. a national DCAT-AP profile that adds mandatory fields).
+        The tool covers the base standards only; local profiles may have different
+        compatibility characteristics.
+      </li>
+      <li>
+        <strong>Three-or-more-hop paths</strong> — conversion chains longer than
+        one intermediate standard are not analysed.
+      </li>
+      <li>
+        <strong>Restricted NATO documents</strong> — ADatP-5636, ADatP-4774, and
+        ADatP-4778 are NATO NSO documents. The field definitions used in this tool
+        are based on publicly available NATO standardisation information and
+        published NATO policy; some nuances of the normative text may not be fully
+        reflected.
+      </li>
+      <li>
+        <strong>Standard evolution</strong> — standards are versioned documents.
+        The versions covered are listed in each standard's description. Newer
+        versions of any standard may change field definitions, obligations, or
+        vocabulary encodings in ways not yet reflected here.
+      </li>
+    </ul>
+  </div>
+
+  {# ═══════════════════ 10. REPLICATION ═══════════════════ #}
+  <div class="method-section" id="sec-replication">
+    <h3>10. Replication guide</h3>
+    <p>
+      All data that drives the assessments is in two files in the
+      <code>standards/</code> directory:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr><th>File</th><th>Contains</th><th>To critique or extend</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>standards/crosswalk.py</code></td>
+          <td>All <code>CrosswalkEntry</code> objects (the hand-coded field mappings)
+              and all <code>ConflictEntry</code> objects (hand-coded conflicts), plus
+              the <code>PAIR_SOURCES</code> verification sources.</td>
+          <td>Add, modify, or remove <code>CrosswalkEntry</code> or
+              <code>ConflictEntry</code> objects. All scores, verdicts, round-trip
+              results, and conversion paths recompute automatically on next request.</td>
+        </tr>
+        <tr>
+          <td><code>standards/nato/adatp5636.py</code><br>
+              <code>standards/eu/dublin_core.py</code><br>
+              (etc.)</td>
+          <td>Field definitions for each standard — name, description, obligation,
+              cardinality, representation term, allowed values, and section reference.</td>
+          <td>Modify <code>FieldDefinition</code> objects to correct or extend
+              field definitions. The <code>reference</code> attribute holds the
+              section citation shown throughout the UI.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p>
+      To add a new standard, create a new file in the appropriate subdirectory,
+      define a class inheriting from <code>MetadataStandard</code>, register it
+      in <code>standards/registry.py</code>, and add crosswalk entries for it in
+      <code>standards/crosswalk.py</code>. The UI, scores, and reports will
+      pick it up automatically.
+    </p>
+
+    <div class="callout callout-info">
+      <strong>Testing changes:</strong> After editing Python files, restart the Flask server
+      (<kbd>Ctrl+C</kbd> then <code>run.bat</code>). The test client at the bottom of
+      <code>app.py</code> checks that all standard pages return HTTP 200. Run it with
+      <code>python -c "from app import app; ..."</code> as shown in the developer notes.
+    </div>
+  </div>
+
+  {# ═══════════════════ 11. RELATED ACADEMIC LITERATURE ═══════════════════ #}
+  <div class="method-section" id="sec-literature">
+    <h3>11. Related academic literature</h3>
+    <p>
+      The following peer-reviewed publications address metadata standard comparison,
+      crosswalk methodology, and interoperability in ways that are directly relevant to
+      the approach used in this tool. No single publication compares the exact combination
+      of standards covered here (NATO ↔ EU ↔ ISO ↔ NIST), but the methodological
+      foundations — crosswalk design, compatibility scoring, schema-level vs record-level
+      interoperability — are well established in the library and information science literature.
+    </p>
+
+    {# Publication cards #}
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              Metadata Interoperability and Standardization — A Study of Methodology
+              <span class="text-muted fw-normal">(Parts I &amp; II)</span>
+            </div>
+            <div class="text-muted small mt-1">
+              Chan, L.M. &amp; Zeng, M.L. &nbsp;·&nbsp;
+              <em>D-Lib Magazine</em>, Vol. 12, No. 6, June 2006 &nbsp;·&nbsp;
+              DOI: <a href="https://doi.org/10.1045/june2006-chan" target="_blank" rel="noopener">10.1045/june2006-chan</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#003189;color:#fff;white-space:nowrap;flex-shrink:0;">Foundational</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          The most widely cited treatment of metadata interoperability methodology.
+          Examines how rapid growth of Internet resources and digital collections has produced a
+          proliferation of metadata schemas across different user communities and resource types.
+          Identifies three operational levels where interoperability can be achieved:
+          <strong>schema level</strong> (crosswalks, application profiles, registries),
+          <strong>record level</strong> (element-by-element semantic mapping to convert
+          or combine metadata records), and <strong>repository level</strong> (mapping value
+          strings for cross-collection searching). The crosswalk approach and the distinction
+          between structural and value-level interoperability used in this tool are directly
+          grounded in this framework.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              Towards an Interoperability Framework for Metadata Standards
+            </div>
+            <div class="text-muted small mt-1">
+              Nilsson, M., Johnston, P., Naeve, A. &amp; Powell, A. &nbsp;·&nbsp;
+              <em>Proc. International Conference on Dublin Core and Metadata Applications</em>
+              (DC-2006), Manzanillo, Mexico &nbsp;·&nbsp;
+              DOI: <a href="https://doi.org/10.23106/dcmi.952108357" target="_blank" rel="noopener">10.23106/dcmi.952108357</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#003189;color:#fff;white-space:nowrap;flex-shrink:0;">Foundational</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Proposes a conceptual metadata framework — built on the DCMI Abstract Model — that
+          integrates metadata <em>vocabularies</em>, <em>schemas</em>, <em>formats</em>, and
+          <em>application profiles</em> into a single unified structure for analysing and
+          comparing standards. The framework is used to compare Dublin Core and IEEE LOM,
+          highlighting key structural differences and gaps. Directly relevant to the
+          field-level mapping approach and the treatment of application profiles (DCAT-AP-SE,
+          INSPIRE) as constrained profiles of base standards used here.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              GeoDCAT-AP: Representing Geographic Metadata by Using the DCAT Application
+              Profile for Data Portals in Europe
+            </div>
+            <div class="text-muted small mt-1">
+              Perego, A., Cetl, V., Friis-Christensen, A. &amp; Lutz, M. &nbsp;·&nbsp;
+              <em>JRC Technical Report</em>, European Commission Joint Research Centre, 2017 &nbsp;·&nbsp;
+              Report No.: JRC107410 &nbsp;·&nbsp;
+              <a href="https://publications.jrc.ec.europa.eu/repository/handle/JRC107410" target="_blank" rel="noopener">JRC Publications</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#003399;color:#fff;white-space:nowrap;flex-shrink:0;">Published crosswalk</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          The authoritative technical report defining GeoDCAT-AP — an RDF-based representation
+          of ISO 19115 geospatial metadata that is conformant with DCAT-AP. Defines normative
+          mappings between ISO 19115 / INSPIRE metadata elements and DCAT-AP properties,
+          covering classes, properties, cardinality constraints, and controlled vocabulary
+          alignment. This document is the primary source used in this tool for the
+          INSPIRE ↔ ISO 19115 and DCAT-AP ↔ ISO 19115 pair assessments.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              GeoDCAT-AP: Use Cases and Open Issues
+            </div>
+            <div class="text-muted small mt-1">
+              Perego, A., Friis-Christensen, A. &amp; Lutz, M. &nbsp;·&nbsp;
+              <em>Smart Descriptions &amp; Smarter Vocabularies (SDSVoc)</em>, W3C Workshop, 2016 &nbsp;·&nbsp;
+              <a href="https://www.w3.org/2016/11/sdsvoc/SDSVoc16_paper_25" target="_blank" rel="noopener">W3C SDSVoc 2016</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#003399;color:#fff;white-space:nowrap;flex-shrink:0;">Published crosswalk</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Examines practical problems encountered when designing GeoDCAT-AP, focusing on
+          challenges with potential relevance beyond the geospatial domain: profile-based
+          content negotiation, publishing metadata on the Web, representing API-based data
+          access in metadata, and approaches to modelling data quality. Relevant to the
+          conversion path and round-trip fidelity concepts used in this tool, and to
+          the treatment of INSPIRE as a profile of ISO 19115.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              Interoperability of Open Science Metadata: What About the Reality?
+            </div>
+            <div class="text-muted small mt-1">
+              Dang, V.N., Aussenac-Gilles, N., Megdiche, I. &amp; Ravat, F. &nbsp;·&nbsp;
+              <em>Research Challenges in Information Science (RCIS 2023)</em>,
+              Springer LNBIP, 2023 &nbsp;·&nbsp;
+              DOI: <a href="https://doi.org/10.1007/978-3-031-33080-3_28" target="_blank" rel="noopener">10.1007/978-3-031-33080-3_28</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#6c757d;color:#fff;white-space:nowrap;flex-shrink:0;">Critical analysis</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Assesses the real-world state of metadata interoperability across open science
+          datasets from different research communities (medical and Earth system domains).
+          Finds that the diversity of metadata schemas does not allow native interoperability,
+          and evaluates whether current automated matching tools are sufficiently efficient
+          to bridge this gap. The paper's conclusion — that declared interoperability and
+          practical interoperability often diverge — is consistent with this tool's approach
+          of distinguishing structural field mappings from value-level compatibility.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="fw-semibold" style="font-size:0.95rem;">
+              Metadata Standards for Semantic Interoperability in Electronic Government
+            </div>
+            <div class="text-muted small mt-1">
+              Valentim, N., Pacheco, R. &amp; Pinto, H.S. &nbsp;·&nbsp;
+              <em>Proc. 2nd International Conference on Theory and Practice of
+              Electronic Governance (ICEGOV 2008)</em>, Cairo, Egypt &nbsp;·&nbsp;
+              DOI: <a href="https://doi.org/10.1145/1509096.1509111" target="_blank" rel="noopener">10.1145/1509096.1509111</a>
+            </div>
+          </div>
+          <span class="badge" style="background:#6c757d;color:#fff;white-space:nowrap;flex-shrink:0;">Government context</span>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Examines how metadata standards can support semantic interoperability specifically
+          in the e-government domain — a context directly analogous to NATO/EU cross-portal
+          data sharing. Discusses how different public-sector communities adopt different
+          metadata standards and the practical challenges of achieving interoperability across
+          organisational and national boundaries. Provides useful framing for the
+          NATO ↔ EU interoperability problems identified in this tool.
+        </p>
+      </div>
+    </div>
+
+    <div class="callout callout-info mt-3">
+      <strong>Gap in the literature:</strong> No published academic paper was found that
+      specifically compares NATO metadata standards (ADatP-5636, ADatP-4774, ADatP-4778)
+      with EU or ISO standards. The NATO NSO source documents are restricted, which limits
+      public academic engagement with these standards. The assessments in this tool for
+      NATO ↔ non-NATO pairs are therefore classified as <em>assessed</em> (our own
+      semantic analysis) rather than <em>normative</em> or <em>published</em>.
+    </div>
+  </div>
+
+  {# ── Footer links ─────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm" style="background:#f0f4ff;">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">&#128270; Explore the data</h5>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('compare_view') }}"
+           class="btn btn-primary btn-sm">Full compatibility matrix</a>
+        <a href="{{ url_for('pairwise_select') }}"
+           class="btn btn-outline-secondary btn-sm">Compare two standards</a>
+        <a href="{{ url_for('tutorial_view') }}"
+           class="btn btn-outline-secondary btn-sm">Tutorial walkthrough</a>
+        {% for std in all_standards %}
+        <a href="{{ url_for('report_view', standard_id=std.id) }}"
+           class="btn btn-outline-secondary btn-sm">{{ std.name }} report</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

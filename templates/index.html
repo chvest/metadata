@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}NATO Metadata Standards Tool — Home{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="hero-section">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-7">
+        <h1 class="display-4 fw-bold text-white mb-3">
+          Metadata Standards<br>Comparison Tool
+        </h1>
+        <p class="lead text-light opacity-90 mb-4">
+          Detect, validate, generate, and compare metadata records across
+          NATO, EU, ISO, and NIST metadata standards — fully offline.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{{ url_for('detect_view') }}" class="btn btn-light btn-lg px-4">
+            Detect Standard
+          </a>
+          <a href="{{ url_for('generate_view') }}" class="btn btn-outline-light btn-lg px-4">
+            Generate Metadata
+          </a>
+          <a href="{{ url_for('compare_view') }}" class="btn btn-outline-light btn-lg px-4">
+            Compatibility Matrix
+          </a>
+        </div>
+      </div>
+      <div class="col-lg-5 d-none d-lg-block">
+        <div class="standards-cloud text-center">
+          {% for std in all_standards %}
+          <span class="std-badge domain-{{ std.domain|lower }}">{{ std.name }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature cards -->
+<div class="container py-5">
+  <div class="row g-4 mb-5">
+    <div class="col-md-6 col-lg-3">
+      <div class="feature-card card h-100 border-0 shadow-sm">
+        <div class="card-body text-center p-4">
+          <div class="feature-icon mb-3 text-nato">&#128269;</div>
+          <h5 class="card-title fw-bold">Detect Standard</h5>
+          <p class="card-text text-muted small">
+            Upload or paste a JSON/XML metadata record and instantly identify
+            which standard it conforms to, with confidence scores and
+            field-by-field analysis.
+          </p>
+          <a href="{{ url_for('detect_view') }}" class="btn btn-sm btn-nato mt-2">
+            Try It
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="feature-card card h-100 border-0 shadow-sm">
+        <div class="card-body text-center p-4">
+          <div class="feature-icon mb-3 text-success">&#9889;</div>
+          <h5 class="card-title fw-bold">Generate Metadata</h5>
+          <p class="card-text text-muted small">
+            Select any standard and generate a realistic example metadata record
+            with fake but well-formed values — available in both JSON and XML.
+          </p>
+          <a href="{{ url_for('generate_view') }}" class="btn btn-sm btn-success mt-2">
+            Generate
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="feature-card card h-100 border-0 shadow-sm">
+        <div class="card-body text-center p-4">
+          <div class="feature-icon mb-3 text-primary">&#128200;</div>
+          <h5 class="card-title fw-bold">Compatibility Matrix</h5>
+          <p class="card-text text-muted small">
+            Explore an interactive heatmap showing field-level compatibility
+            across all 10 supported standards. Click cells to drill into crosswalk details.
+          </p>
+          <a href="{{ url_for('compare_view') }}" class="btn btn-sm btn-primary mt-2">
+            View Matrix
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="feature-card card h-100 border-0 shadow-sm">
+        <div class="card-body text-center p-4">
+          <div class="feature-icon mb-3 text-danger">&#128196;</div>
+          <h5 class="card-title fw-bold">Download Reports</h5>
+          <p class="card-text text-muted small">
+            Download detailed HTML or PDF compatibility reports for any standard,
+            including crosswalk tables, coverage charts, and field definitions.
+          </p>
+          <div class="dropdown mt-2">
+            <button class="btn btn-sm btn-danger dropdown-toggle" data-bs-toggle="dropdown">
+              Reports
+            </button>
+            <ul class="dropdown-menu">
+              {% for std in all_standards %}
+              <li>
+                <a class="dropdown-item small" href="{{ url_for('report_view', standard_id=std.id) }}">
+                  {{ std.name }}
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard Suites -->
+  <h2 class="fw-bold mb-3">Standard Suites</h2>
+  <p class="text-muted mb-4">
+    Some standards only make sense in combination. These suites group standards
+    by how they depend on or complement each other in practice.
+  </p>
+  <div class="row g-4 mb-5">
+    {% for suite in all_suites %}
+    <div class="col-md-6">
+      <a href="{{ url_for('suite_view', suite_id=suite.id) }}" class="text-decoration-none">
+        <div class="card shadow-sm h-100 border-0"
+             style="border-top: 4px solid {{ suite.color }} !important;
+                    transition: transform 0.18s, box-shadow 0.18s;"
+             onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.12)'"
+             onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h5 class="fw-bold mb-0" style="color:{{ suite.color }}">{{ suite.name }}</h5>
+              <span class="badge rounded-pill text-white" style="background:{{ suite.color }}">
+                {{ suite.members|length }} standards
+              </span>
+            </div>
+            <p class="text-muted small mb-3">
+              {{ suite.description[:160] }}{% if suite.description|length > 160 %}…{% endif %}
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+              {% for member in suite.members %}
+              <span class="badge rounded-pill"
+                    style="font-size:0.72rem; background:
+                      {% if member.relationship == 'anchor' %}{{ suite.color }}
+                      {% elif member.relationship == 'requires' %}#dc3545
+                      {% elif member.relationship == 'extends' %}#0d6efd
+                      {% else %}#198754{% endif %}; color:#fff;">
+                {{ member.standard_id | upper | replace('_',' ') }}
+                <span style="opacity:0.75; font-size:0.65rem"> · {{ member.relationship }}</span>
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Standards by domain -->
+  <h2 class="fw-bold mb-4">Supported Standards</h2>
+  <div class="row g-4">
+    {% for domain, stds in standards_by_domain.items() %}
+    {% if stds %}
+    <div class="col-md-6 col-lg-3">
+      <div class="domain-card card border-0 shadow-sm domain-card-{{ domain|lower }}">
+        <div class="card-header domain-header-{{ domain|lower }} border-0">
+          <h6 class="mb-0 fw-bold text-white">{{ domain }}</h6>
+          <small class="text-white opacity-75">{{ stds|length }} standard{{ 's' if stds|length != 1 }}</small>
+        </div>
+        <div class="card-body p-3">
+          {% for std in stds %}
+          <div class="std-item d-flex justify-content-between align-items-start mb-2 pb-2 border-bottom">
+            <div>
+              <strong class="small">{{ std.name }}</strong>
+              <div class="text-muted" style="font-size:0.75rem">{{ std.version }}</div>
+              <div class="text-muted" style="font-size:0.72rem">{{ std.organization }}</div>
+            </div>
+            <div class="d-flex flex-column gap-1 align-items-end">
+              <span class="badge bg-secondary" style="font-size:0.65rem">
+                {{ std.get_mandatory_fields()|length }}M
+                / {{ std.get_optional_fields()|length }}O
+              </span>
+              <a href="{{ url_for('report_view', standard_id=std.id) }}"
+                 class="btn btn-outline-secondary btn-sm py-0" style="font-size:0.7rem">
+                Report
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Quick stats row -->
+  <div class="row g-3 mt-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card text-center p-3 rounded shadow-sm">
+        <div class="stat-number fw-bold">{{ all_standards|length }}</div>
+        <div class="stat-label text-muted small">Standards</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card text-center p-3 rounded shadow-sm">
+        <div class="stat-number fw-bold">
+          {{ all_standards | map(attribute='fields') | map('length') | sum }}
+        </div>
+        <div class="stat-label text-muted small">Total Fields</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card text-center p-3 rounded shadow-sm">
+        <div class="stat-number fw-bold">4</div>
+        <div class="stat-label text-muted small">Domains</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card text-center p-3 rounded shadow-sm">
+        <div class="stat-number fw-bold">100%</div>
+        <div class="stat-label text-muted small">Offline</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

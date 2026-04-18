@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}{{ suite.name }} — NATO Metadata Tool{% endblock %}
+
+{% block extra_head %}
+<style>
+.suite-hero {
+  border-left: 6px solid {{ suite.color }};
+  background: linear-gradient(90deg, #f8f9fa, #fff);
+  padding: 1.5rem;
+  border-radius: 0 8px 8px 0;
+}
+.member-card {
+  border-top: 4px solid {{ suite.color }};
+  transition: box-shadow 0.18s, transform 0.18s;
+}
+.member-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.10) !important; transform: translateY(-2px); }
+.rel-anchor    { background: {{ suite.color }}; color: #fff; }
+.rel-requires  { background: #dc3545; color: #fff; }
+.rel-extends   { background: #0d6efd; color: #fff; }
+.rel-complements { background: #198754; color: #fff; }
+.rel-badge {
+  font-size: 0.7rem; padding: 0.2em 0.6em;
+  border-radius: 3px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.suite-nav-card {
+  border-left: 4px solid;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.suite-nav-card:hover { background: #f8f9fa; }
+.field-badge {
+  font-size: 0.68rem; padding: 0.15em 0.5em; border-radius: 10px;
+}
+
+/* ── Visual example styles ──────────────────────────────────────────── */
+.example-block {
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.6rem;
+}
+.example-block-header {
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.3rem;
+}
+.example-block-desc {
+  font-size: 0.78rem;
+  opacity: 0.88;
+  margin-bottom: 0.6rem;
+}
+.example-fields-table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.example-fields-table th {
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0,0,0,0.18);
+  text-align: left;
+}
+.example-fields-table td {
+  padding: 0.25rem 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  vertical-align: top;
+}
+.example-fields-table td.field-note {
+  opacity: 0.75;
+  font-style: italic;
+}
+.nested-children {
+  margin-left: 1.5rem;
+  margin-top: 0.6rem;
+  border-left: 3px solid rgba(255,255,255,0.3);
+  padding-left: 1rem;
+}
+/* columns layout — stacked full-width; tables are too data-dense for side-by-side */
+.example-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+/* flow layout */
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+.flow-arrow {
+  text-align: center;
+  font-size: 1.4rem;
+  line-height: 1.8rem;
+  color: #6c757d;
+  margin: 0.2rem 0;
+}
+.flow-arrow-label {
+  font-size: 0.72rem;
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+  margin-bottom: 0.3rem;
+}
+/* data-object block (grey, below the nested structure) */
+.data-object-annotation {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-style: italic;
+  margin: 0.4rem 0 0.2rem 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Suite header -->
+  <div class="suite-hero mb-4 shadow-sm">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div class="mb-2">
+          <span class="badge rounded-pill text-white" style="background:{{ suite.color }}; font-size:0.8rem;">
+            Suite
+          </span>
+        </div>
+        <h1 class="fw-bold mb-2">{{ suite.name }}</h1>
+        <p class="text-muted mb-0" style="max-width:700px">{{ suite.description }}</p>
+      </div>
+      <div class="d-flex flex-column gap-2 align-items-end">
+        <span class="badge bg-secondary">{{ suite.members|length }} standards</span>
+        <a href="{{ url_for('compare_view') }}" class="btn btn-sm btn-outline-secondary">
+          Compatibility Matrix
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Relationship legend -->
+  <div class="d-flex gap-3 mb-4 flex-wrap align-items-center">
+    <small class="text-muted fw-semibold">Relationship types:</small>
+    <span><span class="rel-badge rel-anchor">anchor</span>
+      <small class="text-muted ms-1">Primary standard in this suite</small></span>
+    <span><span class="rel-badge rel-requires">requires</span>
+      <small class="text-muted ms-1">Must be used together</small></span>
+    <span><span class="rel-badge rel-extends">extends</span>
+      <small class="text-muted ms-1">Application profile / derived from</small></span>
+    <span><span class="rel-badge rel-complements">complements</span>
+      <small class="text-muted ms-1">Commonly used alongside</small></span>
+  </div>
+
+  <!-- Member cards -->
+  <div class="row g-4 mb-5">
+    {% for item in enriched_members %}
+    {% set member = item.member %}
+    {% set std = item.standard %}
+    <div class="col-lg-{% if enriched_members|length == 2 %}6{% elif enriched_members|length == 3 %}4{% else %}6{% endif %}">
+      <div class="card shadow-sm h-100 member-card">
+        <div class="card-body">
+
+          <!-- Header row -->
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <span class="rel-badge rel-{{ member.relationship }}">{{ member.relationship }}</span>
+              {% if std %}
+              <span class="badge rounded-pill ms-2"
+                    style="background:
+                      {% if std.domain == 'NATO' %}#003189
+                      {% elif std.domain == 'EU' %}#003399
+                      {% elif std.domain == 'ISO' %}#006633
+                      {% else %}#5c2d82{% endif %};
+                    color:#fff; font-size:0.7rem;">
+                {{ std.domain }}
+              </span>
+              {% endif %}
+            </div>
+            {% if std %}
+            <div class="text-end">
+              <span class="badge bg-danger field-badge">{{ std.get_mandatory_fields()|length }}M</span>
+              <span class="badge bg-secondary field-badge ms-1">{{ std.get_optional_fields()|length }}O</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Name & full name -->
+          {% if std %}
+          <h5 class="fw-bold mb-1">{{ std.name }}</h5>
+          <p class="text-muted small mb-2">{{ std.full_name }}</p>
+          <p class="text-muted" style="font-size:0.78rem">
+            {{ std.version }} &middot; {{ std.organization }}
+          </p>
+          {% else %}
+          <h5 class="fw-bold mb-1 text-muted">{{ member.standard_id }}</h5>
+          {% endif %}
+
+          <!-- Role in suite -->
+          <div class="alert alert-light border py-2 px-3 mb-3" style="font-size:0.82rem">
+            <strong>Role in this suite:</strong> {{ member.role }}
+          </div>
+
+          <!-- Standard description (truncated) -->
+          {% if std %}
+          <p class="small text-muted mb-3">
+            {{ std.description[:220] }}{% if std.description|length > 220 %}…{% endif %}
+          </p>
+          {% endif %}
+
+          <!-- Action buttons -->
+          {% if std %}
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('report_view', standard_id=std.id) }}"
+               class="btn btn-sm btn-outline-primary">
+              View Report
+            </a>
+            <a href="{{ url_for('generate_view') }}?standard_id={{ std.id }}"
+               class="btn btn-sm btn-outline-secondary">
+              Generate Example
+            </a>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ── Visual Example ─────────────────────────────────────────────────── -->
+  {% if example %}
+  <div class="card shadow-sm mb-5 border-0">
+    <div class="card-header border-0 py-3"
+         style="background: linear-gradient(90deg, {{ suite.color }}22, #f8f9fa); border-left: 4px solid {{ suite.color }} !important;">
+      <h5 class="fw-bold mb-0">Practical Example</h5>
+    </div>
+    <div class="card-body p-4">
+      <h6 class="fw-semibold mb-1">{{ example.title }}</h6>
+      <p class="text-muted small mb-4" style="max-width:750px">{{ example.description }}</p>
+
+      {# ── Recursive macro for nested blocks ── #}
+      {% macro render_block(block, depth) %}
+      <div class="example-block"
+           style="background:{{ block.color }}; color:{{ block.text_color }}; {% if depth > 0 %}border: 2px solid rgba(255,255,255,0.25);{% endif %}">
+        <div class="example-block-header">{{ block.label }}</div>
+        {% if block.description %}
+        <div class="example-block-desc">{{ block.description }}</div>
+        {% endif %}
+        {% if block.fields %}
+        <table class="example-fields-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Field</th>
+              <th style="width:42%">Example value</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in block.fields %}
+            <tr>
+              <td><code style="background:rgba(0,0,0,0.25);padding:1px 4px;border-radius:3px;font-size:0.72rem;color:inherit">{{ f.name }}</code></td>
+              <td>{{ f.value }}</td>
+              <td class="field-note">{{ f.note }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+        {% if block.children %}
+        <div class="nested-children">
+          {% for child in block.children %}
+          {{ render_block(child, depth + 1) }}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endmacro %}
+
+      {# ── Nested layout ── #}
+      {% if example.layout == "nested" %}
+        {% for block in example.blocks %}
+          {% if block.annotation %}
+          <div class="data-object-annotation">{{ block.annotation | safe }}</div>
+          {% endif %}
+          {{ render_block(block, 0) }}
+        {% endfor %}
+
+      {# ── Columns layout ── #}
+      {% elif example.layout == "columns" %}
+        <div style="display:flex; flex-direction:column; gap:1rem;">
+          {% for block in example.blocks %}
+            {{ render_block(block, 0) }}
+          {% endfor %}
+        </div>
+
+      {# ── Flow layout ── #}
+      {% elif example.layout == "flow" %}
+        {% for block in example.blocks %}
+          <div class="flow-step">
+            {% if block.annotation %}
+            <div class="flow-arrow">&#8595;</div>
+            <div class="flow-arrow-label">{{ block.annotation }}</div>
+            {% endif %}
+            {{ render_block(block, 0) }}
+          </div>
+          {% if not loop.last and not example.blocks[loop.index].annotation %}
+          <div class="flow-arrow">&#8595;</div>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Generate full suite section -->
+  <div class="card shadow-sm mb-5 border-0" style="border-left: 4px solid {{ suite.color }} !important; border-left-width: 4px !important;">
+    <div class="card-body">
+      <h5 class="fw-bold mb-1">Generate Full Suite Example</h5>
+      <p class="text-muted small mb-3">
+        Generate example metadata records for all standards in this suite at once —
+        useful for testing interoperability and understanding how the standards relate in practice.
+      </p>
+      <div class="d-flex gap-2 flex-wrap">
+        {% for item in enriched_members %}
+        {% set std = item.standard %}
+        {% if std %}
+        <form method="POST" action="{{ url_for('generate_view') }}" style="display:inline">
+          <input type="hidden" name="standard_id" value="{{ std.id }}">
+          <input type="hidden" name="include_optional" value="on">
+          <input type="hidden" name="include_conditional" value="on">
+          <button type="submit" class="btn btn-sm"
+                  style="background:{{ suite.color }};color:#fff;border:none;">
+            Generate {{ std.name }}
+          </button>
+        </form>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Other suites -->
+  {% if all_suites|length > 1 %}
+  <h5 class="fw-bold mb-3">Other Suites</h5>
+  <div class="row g-3">
+    {% for s in all_suites %}
+    {% if s.id != suite.id %}
+    <div class="col-md-6">
+      <a href="{{ url_for('suite_view', suite_id=s.id) }}" class="text-decoration-none">
+        <div class="suite-nav-card card border-0 shadow-sm p-3"
+             style="border-left-color: {{ s.color }} !important;">
+          <div class="d-flex align-items-center gap-2">
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;
+                         background:{{ s.color }};flex-shrink:0;"></span>
+            <div>
+              <strong class="small">{{ s.name }}</strong>
+              <div class="text-muted" style="font-size:0.75rem">
+                {{ s.members|length }} standards
+              </div>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

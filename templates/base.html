@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}NATO Metadata Standards Tool{% endblock %}</title>
+  <!-- Bootstrap 5 CDN (for offline use: download to static/bootstrap.min.css and update href) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────────── -->
+<nav class="navbar navbar-expand-lg navbar-dark nato-navbar">
+  <div class="container">
+    <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
+      <span class="nato-shield">&#9632;</span>
+      NATO Metadata Standards Tool
+    </a>
+    <button class="navbar-toggler" type="button"
+            data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav ms-auto gap-1">
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+             href="{{ url_for('index') }}">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'detect_view' %}active{% endif %}"
+             href="{{ url_for('detect_view') }}">Detect Standard</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'generate_view' %}active{% endif %}"
+             href="{{ url_for('generate_view') }}">Generate Metadata</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'compare_view' %}active{% endif %}"
+             href="{{ url_for('compare_view') }}">Compatibility Matrix</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'tutorial_view' %}active{% endif %}"
+             href="{{ url_for('tutorial_view') }}">Tutorial</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'methodology_view' %}active{% endif %}"
+             href="{{ url_for('methodology_view') }}">Methodology</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint in ('pairwise_view','pairwise_select') %}active{% endif %}"
+             href="{{ url_for('pairwise_select') }}">Compare Two</a>
+        </li>
+        <!-- Suites dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint == 'suite_view' %}active{% endif %}"
+             href="#" data-bs-toggle="dropdown">
+            Suites
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+            {% for suite in all_suites %}
+            <li>
+              <a class="dropdown-item" href="{{ url_for('suite_view', suite_id=suite.id) }}">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+                             background:{{ suite.color }};margin-right:6px;"></span>
+                {{ suite.name }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        <!-- Dark mode toggle -->
+        <li class="nav-item ms-1 d-flex align-items-center">
+          <button id="dark-mode-toggle" onclick="toggleDarkMode()"
+                  title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
+        </li>
+        <!-- Reports dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            Reports
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+            {% for std in all_standards %}
+            <li>
+              <a class="dropdown-item" href="{{ url_for('report_view', standard_id=std.id) }}">
+                <span class="domain-dot domain-{{ std.domain|lower }}"></span>
+                {{ std.name }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Flash / alert area ──────────────────────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="container mt-2">
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- ── Main content ─────────────────────────────────────────────────────────── -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+<footer class="nato-footer mt-5 py-3">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <small class="text-muted">
+          <strong>Supported Standards:</strong>
+          ADatP-5636 Ed.A V1 &middot; ADatP-4774 &middot; ADatP-4778 &middot;
+          Dublin Core / ISO 15836 &middot; DCAT-AP 2.1.1 &middot; INSPIRE &middot;
+          ISO 19115-1:2014 &middot; ISO 23081-1:2017 &middot;
+          NIST SP 800-60 &middot; NIST SP 800-53 Rev 5
+        </small>
+      </div>
+      <div class="col-md-4 text-end">
+        <small class="text-muted">NATO Metadata Standards Comparison Tool</small>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+        crossorigin="anonymous"></script>
+{% block extra_scripts %}{% endblock %}
+
+<script>
+/* ── Dark mode ─────────────────────────────────────────────────────────────── */
+(function () {
+  // Apply saved preference before first paint (inline, before DOM ready)
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark') {
+    document.getElementById('html-root').setAttribute('data-bs-theme', 'dark');
+  }
+})();
+
+/* ── Plotly chart theming ───────────────────────────────────────────────── */
+function updatePlotlyTheme(dark) {
+  if (typeof Plotly === 'undefined') return;
+  const layout = dark ? {
+    paper_bgcolor: '#1e2535',
+    plot_bgcolor:  '#161b27',
+    font:  { color: '#e2e8f0' },
+    title: { font: { color: '#93c5fd' } },
+    xaxis: { gridcolor: '#2d3748', zerolinecolor: '#374151',
+             tickfont: { color: '#94a3b8' }, title: { font: { color: '#cbd5e1' } } },
+    yaxis: { gridcolor: '#2d3748', zerolinecolor: '#374151',
+             tickfont: { color: '#94a3b8' }, title: { font: { color: '#cbd5e1' } } },
+  } : {
+    paper_bgcolor: '#ffffff',
+    plot_bgcolor:  '#ffffff',
+    font:  { color: '#212529' },
+    title: { font: { color: '#003189' } },
+    xaxis: { gridcolor: '#e9ecef', zerolinecolor: '#dee2e6',
+             tickfont: { color: '#495057' }, title: { font: { color: '#212529' } } },
+    yaxis: { gridcolor: '#e9ecef', zerolinecolor: '#dee2e6',
+             tickfont: { color: '#495057' }, title: { font: { color: '#212529' } } },
+  };
+  document.querySelectorAll('.js-plotly-plot').forEach(div => {
+    try { Plotly.relayout(div, layout); } catch(e) {}
+  });
+}
+
+function toggleDarkMode() {
+  const html = document.getElementById('html-root');
+  const btn  = document.getElementById('dark-mode-toggle');
+  const isDark = html.getAttribute('data-bs-theme') === 'dark';
+  if (isDark) {
+    html.removeAttribute('data-bs-theme');
+    localStorage.setItem('theme', 'light');
+    btn.textContent = '🌙';
+    btn.title = 'Switch to dark mode';
+    updatePlotlyTheme(false);
+  } else {
+    html.setAttribute('data-bs-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+    btn.textContent = '☀️';
+    btn.title = 'Switch to light mode';
+    updatePlotlyTheme(true);
+  }
+}
+
+// Sync button icon and Plotly theme on page load after DOM is ready
+document.addEventListener('DOMContentLoaded', function () {
+  const saved = localStorage.getItem('theme');
+  const btn   = document.getElementById('dark-mode-toggle');
+  if (saved === 'dark') {
+    if (btn) { btn.textContent = '☀️'; btn.title = 'Switch to light mode'; }
+    // Plotly may render asynchronously — poll briefly then apply
+    let attempts = 0;
+    const applyPlotly = setInterval(function () {
+      if (typeof Plotly !== 'undefined' && document.querySelectorAll('.js-plotly-plot').length > 0) {
+        updatePlotlyTheme(true);
+        clearInterval(applyPlotly);
+      }
+      if (++attempts > 20) clearInterval(applyPlotly); // give up after ~2 s
+    }, 100);
+  }
+});
+</script>
+</body>
+</html>

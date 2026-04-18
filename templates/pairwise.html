@@ -1,0 +1,886 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if data %}{{ data.std_a.name }} vs {{ data.std_b.name }}{% else %}Compare Two Standards{% endif %}
+  — NATO Metadata Tool
+{% endblock %}
+
+{# ── Macro: mapping table (defined before use) ───────────────────────────── #}
+{% macro mapping_table(entries, src, tgt) %}
+<div class="table-responsive">
+<table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
+  <thead class="table-light">
+    <tr>
+      <th style="width:26%">{{ src.name }} field</th>
+      <th style="width:26%">{{ tgt.name }} field</th>
+      <th style="width:10%">Mapping</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td>
+        <code>{{ e.source_field }}</code>
+        {% if e.source_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.source_ref }}</span>{% endif %}
+      </td>
+      <td>
+        {% if e.target_field %}
+          <code>{{ e.target_field }}</code>
+          {% if e.target_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.target_ref }}</span>{% endif %}
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </td>
+      <td>
+        <span class="mapping-{{ e.mapping_type }}">{{ e.mapping_type }}</span>
+      </td>
+      <td><small class="text-muted">{{ e.notes }}</small></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{# ── Macro: value issue card ─────────────────────────────────────────────── #}
+{% macro value_issue_card(vi) %}
+{% set sev_class = {
+  "blocking": "conflict-blocking",
+  "lossy": "conflict-lossy",
+  "transform_required": "conflict-transform"
+} %}
+{% set sev_badge = {
+  "blocking": "danger",
+  "lossy": "warning text-dark",
+  "transform_required": "info text-dark"
+} %}
+{% set type_labels = {
+  "vocabulary_mismatch": "Vocabulary mismatch",
+  "format_change": "Format change",
+  "structure_loss": "Structure loss",
+  "collapse": "Field collapse",
+  "uri_required": "URI required"
+} %}
+<div class="p-3 mb-3 rounded {{ sev_class.get(vi.severity, '') }}">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <strong>{{ vi.source_field }}</strong>
+    <span class="text-muted">→</span>
+    <code>{{ vi.target_field }}</code>
+    <span class="badge bg-{{ sev_badge.get(vi.severity, 'secondary') }} ms-1">
+      {{ vi.severity | replace('_', ' ') | title }}
+    </span>
+    <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">
+      {{ type_labels.get(vi.issue_type, vi.issue_type) }}
+    </span>
+  </div>
+  <div class="mb-2"><strong>{{ vi.title }}</strong></div>
+  <p class="mb-2 small">{{ vi.description }}</p>
+  {% if vi.source_vocab or vi.target_vocab %}
+  <div class="row g-2 mb-2">
+    {% if vi.source_vocab %}
+    <div class="col-md-6">
+      <div class="border rounded p-2 bg-white" style="font-size:0.82rem;">
+        <span class="fw-semibold text-muted small d-block mb-1">Source vocabulary</span>
+        {{ vi.source_vocab }}
+      </div>
+    </div>
+    {% endif %}
+    {% if vi.target_vocab %}
+    <div class="col-md-6">
+      <div class="border rounded p-2 bg-white" style="font-size:0.82rem;">
+        <span class="fw-semibold text-muted small d-block mb-1">Target vocabulary</span>
+        {{ vi.target_vocab }}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if vi.example_values %}
+  <div class="mb-2">
+    <span class="fw-semibold small text-muted">Example conversions</span>
+    <table class="table table-sm table-bordered mt-1 mb-0" style="font-size:0.8rem; background:#fff;">
+      <thead class="table-light">
+        <tr>
+          <th>Source value</th>
+          <th>Target value</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for src_val, tgt_val, note in vi.example_values %}
+        <tr>
+          <td><code>{{ src_val }}</code></td>
+          <td>{% if tgt_val %}<code>{{ tgt_val }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td><small class="text-muted">{{ note }}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if vi.transform_spec %}
+  <div class="mt-2 p-2 rounded" style="background:#f8f9fa; border:1px solid #dee2e6; font-size:0.82rem;">
+    <span class="fw-semibold text-muted small">&#128295; Transform specification:</span>
+    {{ vi.transform_spec }}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% block extra_head %}
+<style>
+.score-pill {
+  display: inline-block;
+  font-size: 1.5rem; font-weight: 700;
+  padding: 0.4rem 1rem; border-radius: 8px;
+  min-width: 90px; text-align: center;
+}
+.score-high   { background:#198754; color:#fff; }
+.score-medium { background:#ffc107; color:#212529; }
+.score-low    { background:#fd7e14; color:#fff; }
+.score-none   { background:#dee2e6; color:#6c757d; }
+
+.direction-arrow {
+  font-size: 1.8rem; color: #adb5bd;
+  display: flex; align-items: center; justify-content: center;
+}
+.std-header {
+  border-radius: 8px; padding: 1rem 1.25rem;
+}
+.mapping-exact   { color: #198754; font-weight: 600; }
+.mapping-similar { color: #0d6efd; font-weight: 600; }
+.mapping-partial { color: #fd7e14; font-weight: 600; }
+.mapping-none    { color: #adb5bd; }
+
+.conflict-blocking  { background:#fde8ea; border-left: 4px solid #dc3545; }
+.conflict-lossy     { background:#fff8e1; border-left: 4px solid #ffc107; }
+.conflict-transform { background:#e0f4fb; border-left: 4px solid #0dcaf0; }
+
+.sec-toggle { cursor:pointer; user-select:none; transition:background 0.15s; }
+.sec-toggle:hover { background:#e9ecef !important; }
+.sec-chevron { font-size:0.9rem; color:#6c757d; transition:transform 0.2s; flex-shrink:0; }
+.sec-toggle[aria-expanded="false"] .sec-chevron { transform: rotate(-90deg); }
+
+.field-row-ab { border-left: 3px solid #003189; }
+.field-row-ba { border-left: 3px solid #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Page title + selector -->
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+      <h1 class="fw-bold mb-1">Compare Two Standards</h1>
+      <p class="text-muted mb-0">
+        Select any two standards to see a full side-by-side interoperability analysis.
+      </p>
+    </div>
+  </div>
+
+  <!-- Selector form -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="GET" action="{{ url_for('pairwise_select') }}"
+            class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold small">Standard A</label>
+          <select name="a" class="form-select">
+            <option value="">— choose —</option>
+            {% for domain, stds in standards_by_domain.items() %}
+            {% if stds %}
+            <optgroup label="{{ domain }}">
+              {% for s in stds %}
+              <option value="{{ s.id }}" {% if s.id == id_a %}selected{% endif %}>
+                {{ s.name }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-semibold small">Standard B</label>
+          <select name="b" class="form-select">
+            <option value="">— choose —</option>
+            {% for domain, stds in standards_by_domain.items() %}
+            {% if stds %}
+            <optgroup label="{{ domain }}">
+              {% for s in stds %}
+              <option value="{{ s.id }}" {% if s.id == id_b %}selected{% endif %}>
+                {{ s.name }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100">Compare</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if not data %}
+  <div class="text-center text-muted py-5">
+    <div style="font-size:3rem;">&#8644;</div>
+    <p class="mt-2">Select two standards above to begin.</p>
+  </div>
+  {% else %}
+
+  {# ── Score overview ──────────────────────────────────────────────────────── #}
+  {% set pct_ab = (data.score_ab * 100) | round(1) %}
+  {% set pct_ba = (data.score_ba * 100) | round(1) %}
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+
+      {# Standard name headers #}
+      <div class="row mb-4">
+        <div class="col-5">
+          <div class="std-header"
+               style="background:{% if data.std_a.domain == 'NATO' %}#e8edf8{% elif data.std_a.domain == 'EU' %}#e8ebf7{% elif data.std_a.domain == 'ISO' %}#e8f4ee{% else %}#f0ebf7{% endif %}">
+            <div class="small fw-semibold mb-1"
+                 style="color:{% if data.std_a.domain == 'NATO' %}#003189{% elif data.std_a.domain == 'EU' %}#003399{% elif data.std_a.domain == 'ISO' %}#006633{% else %}#5c2d82{% endif %}">
+              {{ data.std_a.domain }}
+            </div>
+            <div class="fw-bold">{{ data.std_a.name }}</div>
+            <div class="text-muted small">{{ data.std_a.version }}</div>
+          </div>
+        </div>
+        <div class="col-2 direction-arrow">&#8644;</div>
+        <div class="col-5">
+          <div class="std-header"
+               style="background:{% if data.std_b.domain == 'NATO' %}#e8edf8{% elif data.std_b.domain == 'EU' %}#e8ebf7{% elif data.std_b.domain == 'ISO' %}#e8f4ee{% else %}#f0ebf7{% endif %}">
+            <div class="small fw-semibold mb-1"
+                 style="color:{% if data.std_b.domain == 'NATO' %}#003189{% elif data.std_b.domain == 'EU' %}#003399{% elif data.std_b.domain == 'ISO' %}#006633{% else %}#5c2d82{% endif %}">
+              {{ data.std_b.domain }}
+            </div>
+            <div class="fw-bold">{{ data.std_b.name }}</div>
+            <div class="text-muted small">{{ data.std_b.version }}</div>
+          </div>
+        </div>
+      </div>
+
+      {# Suite relationship banner #}
+      {% if data.suite %}
+      <div class="alert border-0 mb-4 d-flex align-items-center gap-3"
+           style="background:{{ data.suite.color }}18; border-left: 4px solid {{ data.suite.color }} !important;">
+        <span style="font-size:1.4rem;">&#128279;</span>
+        <div>
+          <strong>Part of the same suite: {{ data.suite.name }}</strong><br>
+          <span class="text-muted small">
+            These standards are designed to be used together.
+            {{ data.std_b.name }} has relationship
+            <strong>{{ data.relationship_ab }}</strong> to {{ data.std_a.name }} within this suite.
+          </span>
+          <a href="{{ url_for('suite_view', suite_id=data.suite.id) }}"
+             class="btn btn-sm ms-2 text-white" style="background:{{ data.suite.color }}; font-size:0.75rem;">
+            View suite
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Directional scores #}
+      <div class="row text-center g-3 mb-3">
+        <div class="col-md-6">
+          <div class="text-muted small mb-1 fw-semibold">
+            {{ data.std_a.name }} → {{ data.std_b.name }}
+          </div>
+          <div class="score-pill {% if pct_ab >= 50 %}score-high{% elif pct_ab >= 25 %}score-medium{% elif pct_ab > 0 %}score-low{% else %}score-none{% endif %}">
+            {{ pct_ab }}%
+          </div>
+          <div class="text-muted small mt-1">
+            of {{ data.std_a.name }} fields map into {{ data.std_b.name }}
+          </div>
+          {% set n_bl_ab = data.conflicts_ab | selectattr('severity','eq','blocking') | list | length %}
+          {% set n_lo_ab = data.conflicts_ab | selectattr('severity','eq','lossy') | list | length %}
+          {% set n_tr_ab = data.conflicts_ab | selectattr('severity','eq','transform_required') | list | length %}
+          <div class="mt-2 d-flex justify-content-center gap-1 flex-wrap">
+            {% if n_bl_ab %}<span class="badge" style="background:#dc3545;color:#fff;">&#9940; {{ n_bl_ab }} blocking</span>{% endif %}
+            {% if n_lo_ab %}<span class="badge" style="background:#ffc107;color:#664d03;">&#9888; {{ n_lo_ab }} lossy</span>{% endif %}
+            {% if n_tr_ab %}<span class="badge" style="background:#0dcaf0;color:#055160;">&#8635; {{ n_tr_ab }} transform</span>{% endif %}
+            {% if not data.conflicts_ab %}<span class="text-muted small">No conflicts</span>{% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="text-muted small mb-1 fw-semibold">
+            {{ data.std_b.name }} → {{ data.std_a.name }}
+          </div>
+          <div class="score-pill {% if pct_ba >= 50 %}score-high{% elif pct_ba >= 25 %}score-medium{% elif pct_ba > 0 %}score-low{% else %}score-none{% endif %}">
+            {{ pct_ba }}%
+          </div>
+          <div class="text-muted small mt-1">
+            of {{ data.std_b.name }} fields map into {{ data.std_a.name }}
+          </div>
+          {% set n_bl_ba = data.conflicts_ba | selectattr('severity','eq','blocking') | list | length %}
+          {% set n_lo_ba = data.conflicts_ba | selectattr('severity','eq','lossy') | list | length %}
+          {% set n_tr_ba = data.conflicts_ba | selectattr('severity','eq','transform_required') | list | length %}
+          <div class="mt-2 d-flex justify-content-center gap-1 flex-wrap">
+            {% if n_bl_ba %}<span class="badge" style="background:#dc3545;color:#fff;">&#9940; {{ n_bl_ba }} blocking</span>{% endif %}
+            {% if n_lo_ba %}<span class="badge" style="background:#ffc107;color:#664d03;">&#9888; {{ n_lo_ba }} lossy</span>{% endif %}
+            {% if n_tr_ba %}<span class="badge" style="background:#0dcaf0;color:#055160;">&#8635; {{ n_tr_ba }} transform</span>{% endif %}
+            {% if not data.conflicts_ba %}<span class="text-muted small">No conflicts</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <p class="text-muted small text-center mb-0">
+        Scores are directional: X% means that fraction of the <em>source</em> standard's fields
+        have a defined equivalent in the target. Scores are not symmetric.
+      </p>
+    </div>
+  </div>
+
+  {# ── Interoperability verdict ─────────────────────────────────────────── #}
+  <div class="card shadow-sm border-0 mb-4"
+       style="border-left: 6px solid {{ data.verdict.color }} !important;">
+    <div class="card-body d-flex align-items-center gap-3 py-3">
+      <div>
+        <span class="badge fs-6 fw-bold px-3 py-2"
+              style="background:{{ data.verdict.color }};color:#fff;letter-spacing:0.02em;">
+          {{ data.verdict.label }}
+        </span>
+      </div>
+      <div>
+        <span class="text-muted small">{{ data.verdict.sublabel }}</span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Sources & verification ───────────────────────────────────────────── #}
+  {% if data.sources %}
+  {% set basis_order = {'normative': 0, 'published': 1, 'assessed': 2} %}
+  {% set overall_basis = data.sources | map(attribute='basis') | list %}
+  {% set has_normative  = 'normative' in overall_basis %}
+  {% set has_published  = 'published' in overall_basis %}
+  {% set all_assessed   = overall_basis | select('equalto','assessed') | list | length == overall_basis | length %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-sources"
+         aria-expanded="false">
+      <h5 class="mb-0">
+        &#128214; Sources &amp; Verification
+        {% if has_normative %}
+          <span class="badge ms-2" style="background:#198754;color:#fff;font-size:0.72rem;">Normative sources available</span>
+        {% elif has_published %}
+          <span class="badge ms-2" style="background:#0d6efd;color:#fff;font-size:0.72rem;">Published crosswalk available</span>
+        {% else %}
+          <span class="badge ms-2" style="background:#6c757d;color:#fff;font-size:0.72rem;">Author assessment</span>
+        {% endif %}
+      </h5>
+      <span class="sec-chevron" style="transform:rotate(-90deg);">&#9660;</span>
+    </div>
+    <div id="sec-sources" class="collapse">
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          The evidence basis for the crosswalk assessments on this page.
+          <strong>Normative</strong> = mapping defined by the standard itself.
+          <strong>Published</strong> = mapping documented by an authoritative body.
+          <strong>Author assessment</strong> = our own semantic analysis; no public crosswalk exists.
+        </p>
+        {% for s in data.sources %}
+        {% set b_color = '#198754' if s.basis == 'normative' else ('#0d6efd' if s.basis == 'published' else '#6c757d') %}
+        {% set b_label = 'Normative' if s.basis == 'normative' else ('Published crosswalk' if s.basis == 'published' else 'Author assessment') %}
+        <div class="border rounded p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+            <div class="fw-semibold" style="font-size:0.88rem;">
+              {% if s.url %}
+                <a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title }}</a>
+              {% else %}
+                {{ s.title }}
+              {% endif %}
+            </div>
+            <span class="badge" style="background:{{ b_color }};color:#fff;font-size:0.7rem;">{{ b_label }}</span>
+          </div>
+          <p class="text-muted small mb-0">{{ s.description }}</p>
+          {% if s.sections %}
+          <p class="text-muted small mb-0 mt-1"><strong>Relevant sections:</strong> {{ s.sections }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if all_assessed %}
+        <div class="alert alert-warning border-0 py-2 small mt-2">
+          &#9888; No public crosswalk exists for this standard pair. The assessments on this page
+          are based on semantic analysis of the field definitions in each standard. Treat findings
+          as indicative rather than normatively verified.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Severity legend ─────────────────────────────────────────────────── #}
+  {% if data.conflicts_ab or data.conflicts_ba %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-sev-legend"
+         aria-expanded="false">
+      <h6 class="mb-0 fw-semibold">&#8505; What do the severity levels mean?</h6>
+      <span class="sec-chevron" style="transform:rotate(-90deg);">&#9660;</span>
+    </div>
+    <div id="sec-sev-legend" class="collapse">
+      <div class="card-body py-3">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="rounded p-3 h-100" style="background:#fde8ea;border-left:4px solid #dc3545;">
+              <div class="fw-bold mb-1" style="color:#842029;">&#9940; Blocking</div>
+              <p class="mb-1 small">A conformant record in the source standard <strong>cannot be made fully conformant</strong> in the target standard without either discarding a mandatory field or fabricating a value that was never present.</p>
+              <p class="mb-0 small text-muted">The receiver may still be able to <em>parse</em> the file, but it will <strong>fail validation</strong> against the target standard. This is the most severe level and typically means a round-trip is not safe without human review.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="rounded p-3 h-100" style="background:#fff8e1;border-left:4px solid #ffc107;">
+              <div class="fw-bold mb-1" style="color:#664d03;">&#9888; Lossy</div>
+              <p class="mb-1 small">Conversion is possible and the record will <strong>pass target validation</strong>, but <strong>some information is permanently degraded</strong> in the process.</p>
+              <p class="mb-0 small text-muted">Example: a structured PointOfContact (name, role, email as separate sub-fields) maps to a free-text creator field — the values transfer but the internal structure is flattened and cannot be recovered on the return trip.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="rounded p-3 h-100" style="background:#e0f4fb;border-left:4px solid #0dcaf0;">
+              <div class="fw-bold mb-1" style="color:#055160;">&#8635; Transform required</div>
+              <p class="mb-1 small">The data is fully interoperable, but only <strong>after a specific, well-defined transformation is applied</strong>. No information is permanently lost.</p>
+              <p class="mb-0 small text-muted">Examples: mapping a NATO security classification vocabulary to Dublin Core rights statements; converting ISO 8601 dates to a different date format; splitting a combined field into two separate fields. The transformation must be explicitly defined and consistently applied.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Conflicts — A→B ───────────────────────────────────────────────────── #}
+  {% if data.conflicts_ab %}
+  <div class="card shadow-sm border-0 mb-4" style="border-top:3px solid #dc3545 !important;">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-conf-ab"
+         aria-expanded="true">
+      <h5 class="mb-0">
+        &#9940; Conflicts: {{ data.std_a.name }} → {{ data.std_b.name }}
+        <span class="badge ms-2" style="background:#dc3545;color:#fff;font-size:0.75rem;">
+          {{ data.conflicts_ab | length }}
+        </span>
+      </h5>
+      <span class="sec-chevron">&#9660;</span>
+    </div>
+    <div id="sec-conf-ab" class="collapse show">
+      <div class="card-body">
+        {% for c in data.conflicts_ab %}
+        {% set cls = 'conflict-blocking' if c.severity == 'blocking' else ('conflict-lossy' if c.severity == 'lossy' else 'conflict-transform') %}
+        {% set sev_label = 'Blocking' if c.severity == 'blocking' else ('Data loss' if c.severity == 'lossy' else 'Transform required') %}
+        {% set sev_color = '#dc3545' if c.severity == 'blocking' else ('#e8a000' if c.severity == 'lossy' else '#0077aa') %}
+        <div class="{{ cls }} rounded p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-1 mb-1">
+            <strong style="font-size:0.88rem;">{{ c.title }}</strong>
+            <div class="d-flex gap-1">
+              <span class="badge" style="background:{{ sev_color }};color:#fff;font-size:0.7rem;">{{ sev_label }}</span>
+              <span class="badge bg-secondary" style="font-size:0.7rem;">{{ c.conflict_type | replace('_',' ') }}</span>
+            </div>
+          </div>
+          {% if c.source_field %}<code style="font-size:0.75rem;">{{ c.source_field }}{% if c.target_field %} → {{ c.target_field }}{% endif %}</code><br>{% endif %}
+          <p class="mb-0 small text-muted mt-1">{{ c.description }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Conflicts — B→A ───────────────────────────────────────────────────── #}
+  {% if data.conflicts_ba %}
+  <div class="card shadow-sm border-0 mb-4" style="border-top:3px solid #dc3545 !important;">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-conf-ba"
+         aria-expanded="true">
+      <h5 class="mb-0">
+        &#9940; Conflicts: {{ data.std_b.name }} → {{ data.std_a.name }}
+        <span class="badge ms-2" style="background:#dc3545;color:#fff;font-size:0.75rem;">
+          {{ data.conflicts_ba | length }}
+        </span>
+      </h5>
+      <span class="sec-chevron">&#9660;</span>
+    </div>
+    <div id="sec-conf-ba" class="collapse show">
+      <div class="card-body">
+        {% for c in data.conflicts_ba %}
+        {% set cls = 'conflict-blocking' if c.severity == 'blocking' else ('conflict-lossy' if c.severity == 'lossy' else 'conflict-transform') %}
+        {% set sev_label = 'Blocking' if c.severity == 'blocking' else ('Data loss' if c.severity == 'lossy' else 'Transform required') %}
+        {% set sev_color = '#dc3545' if c.severity == 'blocking' else ('#e8a000' if c.severity == 'lossy' else '#0077aa') %}
+        <div class="{{ cls }} rounded p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-1 mb-1">
+            <strong style="font-size:0.88rem;">{{ c.title }}</strong>
+            <div class="d-flex gap-1">
+              <span class="badge" style="background:{{ sev_color }};color:#fff;font-size:0.7rem;">{{ sev_label }}</span>
+              <span class="badge bg-secondary" style="font-size:0.7rem;">{{ c.conflict_type | replace('_',' ') }}</span>
+            </div>
+          </div>
+          {% if c.source_field %}<code style="font-size:0.75rem;">{{ c.source_field }}{% if c.target_field %} → {{ c.target_field }}{% endif %}</code><br>{% endif %}
+          <p class="mb-0 small text-muted mt-1">{{ c.description }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not data.conflicts_ab and not data.conflicts_ba %}
+  <div class="alert alert-success border-0 mb-4">&#10003; No interoperability conflicts identified in either direction.</div>
+  {% endif %}
+
+  {# ── Field mapping table ──────────────────────────────────────────────── #}
+  {% set has_ab = data.all_mappings_ab | length > 0 %}
+  {% set has_ba = data.all_mappings_ba | length > 0 %}
+
+  {% if has_ab or has_ba %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-fields"
+         aria-expanded="true">
+      <h5 class="mb-0">Field Mappings</h5>
+      <span class="sec-chevron">&#9660;</span>
+    </div>
+    <div id="sec-fields" class="collapse show">
+      <div class="card-body p-0">
+
+        {# Tab nav if both directions exist #}
+        {% if has_ab and has_ba %}
+        <ul class="nav nav-tabs px-3 pt-3" id="fieldTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ab">
+              {{ data.std_a.name }} → {{ data.std_b.name }}
+              <span class="badge bg-secondary ms-1">{{ data.all_mappings_ab | length }}</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ba">
+              {{ data.std_b.name }} → {{ data.std_a.name }}
+              <span class="badge bg-secondary ms-1">{{ data.all_mappings_ba | length }}</span>
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active p-0" id="tab-ab">
+            {{ mapping_table(data.all_mappings_ab, data.std_a, data.std_b) }}
+          </div>
+          <div class="tab-pane fade p-0" id="tab-ba">
+            {{ mapping_table(data.all_mappings_ba, data.std_b, data.std_a) }}
+          </div>
+        </div>
+        {% elif has_ab %}
+          <div class="px-3 pt-2 pb-1 text-muted small">{{ data.std_a.name }} → {{ data.std_b.name }}</div>
+          {{ mapping_table(data.all_mappings_ab, data.std_a, data.std_b) }}
+        {% else %}
+          <div class="px-3 pt-2 pb-1 text-muted small">{{ data.std_b.name }} → {{ data.std_a.name }}</div>
+          {{ mapping_table(data.all_mappings_ba, data.std_b, data.std_a) }}
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Round-trip fidelity ──────────────────────────────────────────────── #}
+  {% macro roundtrip_table(rt, src, via) %}
+  {% set s = rt.summary %}
+  {% set pct = ((s.survives / s.total * 100) | round(0) | int) if s.total else 0 %}
+  <div class="mb-3">
+    <div class="d-flex gap-3 align-items-center flex-wrap mb-2">
+      <div class="fw-semibold small">{{ src.name }} → {{ via.name }} → {{ src.name }}</div>
+      <div class="d-flex gap-2">
+        <span class="badge" style="background:#198754;color:#fff;">&#10003; {{ s.survives }} survive</span>
+        <span class="badge" style="background:#fd7e14;color:#fff;">&#8776; {{ s.degraded }} degraded</span>
+        <span class="badge" style="background:#6c757d;color:#fff;">&#10007; {{ s.lost }} lost</span>
+      </div>
+      <div class="ms-auto">
+        <div class="progress" style="width:120px;height:10px;border-radius:5px;" title="{{ pct }}% survive round-trip">
+          <div class="progress-bar" style="width:{{ pct }}%;background:#198754;"></div>
+          {% set deg_pct = ((s.degraded / s.total * 100) | round(0) | int) if s.total else 0 %}
+          <div class="progress-bar" style="width:{{ deg_pct }}%;background:#fd7e14;"></div>
+        </div>
+        <div class="text-muted" style="font-size:0.7rem;text-align:right;">{{ pct }}% intact</div>
+      </div>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0" style="font-size:0.8rem;">
+      <thead class="table-light">
+        <tr>
+          <th style="width:20%">{{ src.name }} field</th>
+          <th style="width:20%">→ {{ via.name }} field</th>
+          <th style="width:8%">Leg 1</th>
+          <th style="width:20%">→ {{ src.name }} field</th>
+          <th style="width:8%">Leg 2</th>
+          <th style="width:10%">Outcome</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rt.fields %}
+        <tr class="{% if row.status == 'lost' %}table-danger{% elif row.status == 'degraded' %}table-warning{% endif %}" style="opacity:{% if row.status == 'lost' %}0.75{% else %}1{% endif %};">
+          <td>
+            <code>{{ row.field }}</code>
+            {% if row.obligation == 'mandatory' %}<span class="badge bg-danger ms-1" style="font-size:0.65rem;">M</span>{% endif %}
+          </td>
+          <td>{% if row.leg1_field %}<code>{{ row.leg1_field }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>{% if row.leg1_type %}<span class="mapping-{{ row.leg1_type }}">{{ row.leg1_type }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>{% if row.leg2_field %}<code>{{ row.leg2_field }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>{% if row.leg2_type %}<span class="mapping-{{ row.leg2_type }}">{{ row.leg2_type }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>
+            {% if row.status == 'survives' %}
+              <span style="color:#198754;font-weight:600;">&#10003; Survives</span>
+            {% elif row.status == 'degraded' %}
+              <span style="color:#fd7e14;font-weight:600;">&#8776; Degraded</span>
+            {% else %}
+              <span style="color:#dc3545;font-weight:600;">&#10007; Lost</span>
+            {% endif %}
+          </td>
+          <td><small class="text-muted">{{ row.leg1_notes }}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endmacro %}
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-roundtrip"
+         aria-expanded="false">
+      <h5 class="mb-0">
+        &#8635; Round-trip Fidelity
+        <span class="text-muted fw-normal small ms-2">What survives A→B→A?</span>
+      </h5>
+      <span class="sec-chevron" style="transform:rotate(-90deg);">&#9660;</span>
+    </div>
+    <div id="sec-roundtrip" class="collapse">
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Shows whether each field in a standard can survive a round-trip conversion through the other standard and back.
+          <strong>Survives</strong> = both legs are exact/similar mappings.
+          <strong>Degraded</strong> = at least one leg is partial.
+          <strong>Lost</strong> = no mapping exists in one or both legs.
+          <span class="badge bg-danger" style="font-size:0.65rem;">M</span> = mandatory field.
+        </p>
+
+        {% if data.roundtrip_ab.summary.total > 0 or data.roundtrip_ba.summary.total > 0 %}
+        {% if data.roundtrip_ab.summary.total > 0 and data.roundtrip_ba.summary.total > 0 %}
+        <ul class="nav nav-tabs mb-3" id="rtTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#rt-tab-ab">
+              {{ data.std_a.name }} round-trip
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#rt-tab-ba">
+              {{ data.std_b.name }} round-trip
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="rt-tab-ab">
+            {{ roundtrip_table(data.roundtrip_ab, data.std_a, data.std_b) }}
+          </div>
+          <div class="tab-pane fade" id="rt-tab-ba">
+            {{ roundtrip_table(data.roundtrip_ba, data.std_b, data.std_a) }}
+          </div>
+        </div>
+        {% elif data.roundtrip_ab.summary.total > 0 %}
+          {{ roundtrip_table(data.roundtrip_ab, data.std_a, data.std_b) }}
+        {% else %}
+          {{ roundtrip_table(data.roundtrip_ba, data.std_b, data.std_a) }}
+        {% endif %}
+        {% else %}
+        <p class="text-muted">No crosswalk data available for this pair.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Conversion paths ────────────────────────────────────────────────── #}
+  {% macro path_card(p, loop_index) %}
+  {% set q_color = '#198754' if p.quality == 'good' else ('#fd7e14' if p.quality == 'fair' else '#dc3545') %}
+  {% set q_icon  = '&#10003;' if p.quality == 'good' else ('&#8776;' if p.quality == 'fair' else '&#9888;') %}
+  <div class="border rounded p-3 mb-2" style="border-left: 4px solid {{ q_color }} !important;">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+      <div class="fw-semibold" style="font-size:0.88rem;">
+        {% for name in p.step_names %}
+          {% if not loop.first %}<span class="text-muted mx-1">→</span>{% endif %}
+          <span class="badge" style="background:#e9ecef;color:#212529;font-weight:600;">{{ name }}</span>
+        {% endfor %}
+      </div>
+      <span class="badge fs-6" style="background:{{ q_color }};color:#fff;">
+        {{ q_icon }} {{ (p.path_score * 100) | round(0) | int }}%
+      </span>
+    </div>
+    <div class="d-flex gap-3 flex-wrap">
+      {% for i in range(p.leg_labels | length) %}
+      {% set leg_color = '#198754' if p.leg_scores[i] >= 0.40 else ('#fd7e14' if p.leg_scores[i] >= 0.20 else '#dc3545') %}
+      <div class="small">
+        <span class="text-muted">{{ p.leg_labels[i] }}:</span>
+        <strong style="color:{{ leg_color }};">{{ (p.leg_scores[i] * 100) | round(0) | int }}%</strong>
+      </div>
+      {% endfor %}
+    </div>
+    {% if p.steps | length > 2 %}
+    <div class="text-muted small mt-1">
+      Via: <strong>{{ p.step_names[1:-1] | join(', ') }}</strong>
+    </div>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {% macro paths_panel(paths, src, tgt) %}
+  {% if paths.direct %}
+  <h6 class="fw-semibold mb-2 small text-uppercase text-muted">Direct path</h6>
+  {{ path_card(paths.direct, 0) }}
+  {% else %}
+  <div class="alert alert-warning border-0 py-2 small mb-3">
+    &#9888; No direct crosswalk from <strong>{{ src.name }}</strong> to <strong>{{ tgt.name }}</strong>.
+  </div>
+  {% endif %}
+
+  {% if paths.via_one %}
+  <h6 class="fw-semibold mb-2 small text-uppercase text-muted mt-3">
+    Via one intermediate
+    <span class="badge bg-secondary ms-1">{{ paths.via_one | length }}</span>
+  </h6>
+  {% for p in paths.via_one %}
+  {{ path_card(p, loop.index) }}
+  {% endfor %}
+  {% else %}
+  <p class="text-muted small mb-0">No single-intermediate paths found.</p>
+  {% endif %}
+  {% endmacro %}
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-paths"
+         aria-expanded="false">
+      <h5 class="mb-0">
+        &#128270; Conversion Paths
+        <span class="text-muted fw-normal small ms-2">Direct and via-intermediate routes</span>
+      </h5>
+      <span class="sec-chevron" style="transform:rotate(-90deg);">&#9660;</span>
+    </div>
+    <div id="sec-paths" class="collapse">
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Shows all routes to convert from one standard to the other — directly or via a single
+          intermediate standard. Path score = weakest leg (bottleneck fidelity).
+          <span style="color:#198754;font-weight:600;">Green ≥ 40%</span> &middot;
+          <span style="color:#fd7e14;font-weight:600;">Amber ≥ 20%</span> &middot;
+          <span style="color:#dc3545;font-weight:600;">Red &lt; 20%</span>.
+        </p>
+
+        <ul class="nav nav-tabs mb-3" id="pathTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#path-tab-ab">
+              {{ data.std_a.name }} → {{ data.std_b.name }}
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#path-tab-ba">
+              {{ data.std_b.name }} → {{ data.std_a.name }}
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="path-tab-ab">
+            {{ paths_panel(data.paths_ab, data.std_a, data.std_b) }}
+          </div>
+          <div class="tab-pane fade" id="path-tab-ba">
+            {{ paths_panel(data.paths_ba, data.std_b, data.std_a) }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Value-level Compatibility ────────────────────────────────────────── #}
+  {% if data.value_issues %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#sec-valueissues"
+         aria-expanded="false">
+      <h5 class="mb-0">
+        &#9881; Value-level Compatibility
+        <span class="text-muted fw-normal small ms-2">Field-value format &amp; vocabulary conflicts</span>
+        <span class="badge bg-warning text-dark ms-2" style="font-size:0.72rem;">{{ data.value_issues | length }} issue{{ 's' if data.value_issues | length != 1 }}</span>
+      </h5>
+      <span class="sec-chevron" style="transform:rotate(-90deg);">&#9660;</span>
+    </div>
+    <div id="sec-valueissues" class="collapse">
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Structural field mappings may be possible even when the <em>values</em> themselves are
+          incompatible — different vocabularies, formats, or cardinality. The issues below describe
+          concrete value-level transformations required when converting between these standards.
+          A field can map structurally but still cause data quality or validation failures if
+          values are not transformed.
+        </p>
+
+        {# group by direction #}
+        {% set issues_ab = data.value_issues | selectattr('source_standard', 'equalto', data.std_a.id) | list %}
+        {% set issues_ba = data.value_issues | selectattr('source_standard', 'equalto', data.std_b.id) | list %}
+
+        {% if issues_ab and issues_ba %}
+        <ul class="nav nav-tabs mb-3" id="valueTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#val-tab-ab">
+              {{ data.std_a.name }} → {{ data.std_b.name }}
+              <span class="badge bg-secondary ms-1">{{ issues_ab | length }}</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#val-tab-ba">
+              {{ data.std_b.name }} → {{ data.std_a.name }}
+              <span class="badge bg-secondary ms-1">{{ issues_ba | length }}</span>
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="val-tab-ab">
+            {% for vi in issues_ab %}{{ value_issue_card(vi) }}{% endfor %}
+          </div>
+          <div class="tab-pane fade" id="val-tab-ba">
+            {% for vi in issues_ba %}{{ value_issue_card(vi) }}{% endfor %}
+          </div>
+        </div>
+        {% elif issues_ab %}
+          {% for vi in issues_ab %}{{ value_issue_card(vi) }}{% endfor %}
+        {% else %}
+          {% for vi in issues_ba %}{{ value_issue_card(vi) }}{% endfor %}
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Quick links ──────────────────────────────────────────────────────── #}
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('report_view', standard_id=id_a) }}" class="btn btn-outline-secondary btn-sm">
+      Full report: {{ data.std_a.name }}
+    </a>
+    <a href="{{ url_for('report_view', standard_id=id_b) }}" class="btn btn-outline-secondary btn-sm">
+      Full report: {{ data.std_b.name }}
+    </a>
+    <a href="{{ url_for('pairwise_view', id_a=id_b, id_b=id_a) }}" class="btn btn-outline-secondary btn-sm">
+      &#8646; Swap A and B
+    </a>
+    {% if data.suite %}
+    <a href="{{ url_for('suite_view', suite_id=data.suite.id) }}" class="btn btn-outline-secondary btn-sm">
+      Suite: {{ data.suite.name }}
+    </a>
+    {% endif %}
+  </div>
+
+  {% endif %}{# end if data #}
+</div>
+{% endblock %}

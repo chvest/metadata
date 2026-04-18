@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+{% block title %}Detect Standard — NATO Metadata Tool{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="page-header mb-4">
+    <h1 class="fw-bold">Detect Metadata Standard</h1>
+    <p class="text-muted">
+      Upload or paste a JSON or XML metadata record to identify which standard it follows,
+      with a confidence score and detailed field analysis.
+    </p>
+  </div>
+
+  <!-- Input form -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header">
+      <ul class="nav nav-tabs card-header-tabs" id="inputTabs">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pasteTab">
+            Paste Text
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#uploadTab">
+            Upload File
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data" id="detectForm">
+        <div class="tab-content">
+
+          <!-- Paste tab -->
+          <div class="tab-pane fade show active" id="pasteTab">
+            <label class="form-label fw-semibold">Paste your JSON or XML metadata:</label>
+            <textarea name="metadata_text" id="metadataText" class="form-control font-monospace"
+                      rows="14" placeholder='Paste JSON or XML here, e.g.
+{
+  "title": "NATO Exercise TRIDENT JUNCTURE 2024 Report",
+  "creator": "type=person; name=Jane Smith; affiliation=HQ NATO",
+  "dateCreated": "2024-03-15",
+  "identifier": "urn:nato:resource:2024:REP-12345"
+}'>{{ raw_input or '' }}</textarea>
+            <div class="mt-2 d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="loadExampleBtn">
+                Load NATO Example
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="loadDCExampleBtn">
+                Load Dublin Core Example
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="loadINSPIREExampleBtn">
+                Load INSPIRE Example
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="clearBtn">
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <!-- Upload tab -->
+          <div class="tab-pane fade" id="uploadTab">
+            <label class="form-label fw-semibold">Upload a .json or .xml file:</label>
+            <input type="file" name="metadata_file" class="form-control"
+                   accept=".json,.xml,.txt">
+            <div class="form-text">Maximum file size: 4 MB</div>
+          </div>
+
+        </div>
+
+        <div class="mt-3">
+          <button type="submit" class="btn btn-nato px-4">
+            Detect Standard
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  {% if result %}
+
+    {% if not result.success %}
+    <div class="alert alert-danger">
+      <strong>Parse Error:</strong> {{ result.error }}
+    </div>
+    {% else %}
+
+    <!-- Top match banner -->
+    {% if result.top_match and result.top_match.score > 0 %}
+    {% set top = result.top_match %}
+    <div class="card border-0 shadow mb-4 top-match-card">
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-7">
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <span class="domain-pill domain-{{ top.domain|lower }}">{{ top.domain }}</span>
+              <h3 class="mb-0 fw-bold">{{ top.standard_full_name }}</h3>
+            </div>
+            <p class="text-muted mb-2">
+              <code>{{ top.standard_id }}</code> &nbsp;|&nbsp;
+              Detected from <strong>{{ result.format | upper }}</strong> input
+            </p>
+            <p class="small mb-0">{{ top.explanation }}</p>
+          </div>
+          <div class="col-md-5 text-md-end mt-3 mt-md-0">
+            <div class="confidence-display">
+              <div class="confidence-pct fw-bold display-6">
+                {{ (top.score * 100) | round(1) }}%
+              </div>
+              <div class="text-muted small mb-2">Confidence</div>
+              <div class="progress" style="height:12px; width:100%">
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width:{{ (top.score * 100) | round(1) }}%">
+                </div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <a href="{{ url_for('report_view', standard_id=top.standard_id) }}"
+                 class="btn btn-outline-nato btn-sm me-2">View Report</a>
+              <a href="{{ url_for('report_view', standard_id=top.standard_id) }}/pdf"
+                 class="btn btn-danger btn-sm">PDF</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Field analysis for top match -->
+    {% if field_analysis %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Field Analysis — {{ result.top_match.standard_name }}</h5>
+        <span class="badge bg-secondary">
+          {{ field_analysis.present_fields | length }} fields matched
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+
+          <!-- Present fields -->
+          <div class="col-lg-6">
+            <h6 class="fw-bold text-success">
+              Present Fields ({{ field_analysis.present_fields | length }})
+            </h6>
+            {% if field_analysis.present_fields %}
+            <div class="table-responsive">
+            <table class="table table-sm table-hover small">
+              <thead class="table-light">
+                <tr>
+                  <th>Field</th>
+                  <th>Obligation</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pf in field_analysis.present_fields %}
+                <tr>
+                  <td>
+                    <code class="small">{{ pf.name }}</code>
+                    {% if pf.group %}<br><span class="text-muted" style="font-size:0.7rem">{{ pf.layer }}/{{ pf.group }}</span>{% endif %}
+                  </td>
+                  <td>
+                    <span class="badge
+                      {% if pf.obligation == 'Mandatory' %}bg-danger
+                      {% elif pf.obligation == 'Conditional' %}bg-warning text-dark
+                      {% else %}bg-secondary{% endif %}
+                      " style="font-size:0.65rem">
+                      {{ pf.obligation }}
+                    </span>
+                  </td>
+                  <td class="text-truncate" style="max-width:180px">
+                    <code class="small text-muted">{{ pf.value[:80] }}{% if pf.value|length > 80 %}…{% endif %}</code>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="text-muted small">No fields matched.</p>
+            {% endif %}
+          </div>
+
+          <!-- Missing mandatory -->
+          <div class="col-lg-6">
+            <h6 class="fw-bold text-danger">
+              Missing Mandatory Fields ({{ field_analysis.missing_mandatory | length }})
+            </h6>
+            {% if field_analysis.missing_mandatory %}
+            <div class="table-responsive">
+            <table class="table table-sm small">
+              <thead class="table-light">
+                <tr><th>Field</th><th>Reference</th></tr>
+              </thead>
+              <tbody>
+                {% for mf in field_analysis.missing_mandatory %}
+                <tr class="table-danger">
+                  <td>
+                    <code>{{ mf.name }}</code>
+                    <div class="text-muted" style="font-size:0.72rem">
+                      {{ mf.description[:100] }}{% if mf.description|length > 100 %}…{% endif %}
+                    </div>
+                  </td>
+                  <td><small>{{ mf.reference }}</small></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+            {% else %}
+            <div class="alert alert-success py-2 small">
+              All mandatory fields are present!
+            </div>
+            {% endif %}
+
+            {% if field_analysis.unknown_fields %}
+            <h6 class="fw-bold text-warning mt-3">
+              Unknown Fields ({{ field_analysis.unknown_fields | length }})
+            </h6>
+            <p class="small text-muted">
+              These fields are not defined in {{ result.top_match.standard_name }}:
+              {% for uf in field_analysis.unknown_fields[:10] %}
+              <code>{{ uf }}</code>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+              {% if field_analysis.unknown_fields | length > 10 %}
+              <em>and {{ field_analysis.unknown_fields | length - 10 }} more...</em>
+              {% endif %}
+            </p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Crosswalk for present fields -->
+        {% set fields_with_crosswalks = field_analysis.present_fields | selectattr('crosswalks') | list %}
+        {% if fields_with_crosswalks %}
+        <hr>
+        <h6 class="fw-bold mt-3">Crosswalk Details for Present Fields</h6>
+        <div class="table-responsive">
+        <table class="table table-sm table-hover small">
+          <thead class="table-dark">
+            <tr>
+              <th>Field</th>
+              <th>Target Standard</th>
+              <th>Target Field</th>
+              <th>Mapping</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pf in fields_with_crosswalks %}
+            {% for cw in pf.crosswalks %}
+            <tr>
+              <td><code>{{ pf.name }}</code></td>
+              <td>{{ cw.target }}</td>
+              <td><code>{{ cw.target_field or '—' }}</code></td>
+              <td>
+                <span class="badge
+                  {% if cw.mapping_type == 'exact' %}bg-success
+                  {% elif cw.mapping_type == 'similar' %}bg-primary
+                  {% elif cw.mapping_type == 'partial' %}bg-warning text-dark
+                  {% else %}bg-secondary{% endif %}">
+                  {{ cw.mapping_type }}
+                </span>
+              </td>
+              <td><small class="text-muted">{{ cw.notes[:120] if cw.notes else '' }}{% if cw.notes and cw.notes|length > 120 %}…{% endif %}</small></td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- All standards scores -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">All Standards — Detection Scores</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>Standard</th>
+              <th>Domain</th>
+              <th>Confidence</th>
+              <th>Mandatory Matched</th>
+              <th>Optional Matched</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in result.results %}
+            <tr class="{% if loop.first and r.score > 0 %}table-success{% endif %}">
+              <td class="text-muted">{{ loop.index }}</td>
+              <td>
+                <strong>{{ r.standard_name }}</strong>
+                <div class="text-muted small">{{ r.standard_full_name }}</div>
+              </td>
+              <td>
+                <span class="domain-pill domain-{{ r.domain|lower }} small">{{ r.domain }}</span>
+              </td>
+              <td style="min-width:140px">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:8px">
+                    <div class="progress-bar
+                      {% if r.score >= 0.7 %}bg-success
+                      {% elif r.score >= 0.4 %}bg-warning
+                      {% else %}bg-danger{% endif %}"
+                      style="width:{{ (r.score * 100)|round(1) }}%">
+                    </div>
+                  </div>
+                  <span class="small fw-bold" style="min-width:40px">
+                    {{ (r.score * 100)|round(1) }}%
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span class="text-success">{{ r.matched_mandatory | length }}</span>
+                / {{ (r.matched_mandatory | length) + (r.missing_mandatory | length) }}
+              </td>
+              <td>{{ r.matched_optional | length }}</td>
+              <td>
+                <a href="{{ url_for('report_view', standard_id=r.standard_id) }}"
+                   class="btn btn-sm btn-outline-secondary">Report</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compatibility for top match -->
+    {% if result.top_match and result.top_match.score > 0 %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          Compatibility of Detected Record ({{ result.top_match.standard_name }})
+          with Other Standards
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Based on the fields present in your metadata record, here is how well they
+          map to each other standard.
+        </p>
+        <div class="row g-2">
+          {% for r in result.results %}
+          {% if r.standard_id != result.top_match.standard_id %}
+          {% set shared = r.matched_optional | length + r.matched_mandatory | length %}
+          <div class="col-md-6 col-lg-4">
+            <div class="compat-mini-card d-flex justify-content-between align-items-center
+                         p-2 rounded border">
+              <div>
+                <span class="domain-dot domain-{{ r.domain|lower }}"></span>
+                <strong class="small">{{ r.standard_name }}</strong>
+                <div class="text-muted" style="font-size:0.72rem">{{ r.domain }}</div>
+              </div>
+              <div class="text-end">
+                <span class="fw-bold
+                  {% if shared >= 5 %}text-success
+                  {% elif shared >= 2 %}text-warning
+                  {% else %}text-danger{% endif %}">
+                  {{ shared }} shared fields
+                </span>
+                <div>
+                  <a href="{{ url_for('report_view', standard_id=r.standard_id) }}"
+                     class="btn btn-xs btn-outline-secondary"
+                     style="font-size:0.7rem;padding:1px 6px">View</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% endif %} {# result.success #}
+  {% endif %} {# result #}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const examples = {
+  nato: `{
+  "title": "Exercise TRIDENT JUNCTURE 2024 — After Action Report",
+  "creator": "type=person; name=James Harrington; affiliation=HQ NATO; email=j.harrington@hq.nato.int; phone=+32-2-707-1234; role=creator",
+  "publisher": "type=organisation; name=NATO Standardization Office; affiliation=HQ NATO; email=nso@hq.nato.int; role=publisher",
+  "dateCreated": "2024-03-15T09:30:00Z",
+  "identifier": "urn:nato:resource:2024:REP-78432",
+  "title": "Exercise TRIDENT JUNCTURE 2024 — After Action Report",
+  "metadataConfidentialityLabel": "PolicyIdentifier=urn:nato:policy:security; Classification=NATO RESTRICTED; CreationDateTime=2024-03-15T09:30:00Z",
+  "originatorConfidentialityLabel": "PolicyIdentifier=urn:nato:policy:security; Classification=NATO RESTRICTED; Category[TagName=Releasability,Type=PERMISSIVE,GenericValue=GBR]; CreationDateTime=2024-03-15T09:30:00Z",
+  "language": "eng",
+  "type": "Report",
+  "abstract": "This after-action report summarises the outcomes of Exercise TRIDENT JUNCTURE 2024, covering force deployment, interoperability assessments, and lessons learned across all participating nations.",
+  "keyword": "Exercise",
+  "dateIssued": "2024-04-01",
+  "version": "1.0",
+  "status": "Active"
+}`,
+  dublin_core: `{
+  "title": "Open Dataset of EU Transport Infrastructure",
+  "creator": "European Commission, DG MOVE",
+  "subject": "Transport infrastructure; Road networks; EU",
+  "description": "A comprehensive open dataset covering road, rail and maritime transport infrastructure across EU member states, updated annually.",
+  "publisher": "Publications Office of the European Union",
+  "contributor": "Member State National Mapping Agencies",
+  "date": "2024-01-15",
+  "type": "Dataset",
+  "format": "application/json",
+  "identifier": "https://data.europa.eu/euodp/en/data/dataset/transport-infra-2024",
+  "source": "https://ec.europa.eu/transport/data",
+  "language": "en",
+  "relation": "https://data.europa.eu/euodp/en/data/dataset/transport-infra-2023",
+  "coverage": "European Union",
+  "rights": "Creative Commons Attribution 4.0 International (CC BY 4.0)"
+}`,
+  inspire: `{
+  "title": "Digital Elevation Model — Alps Region",
+  "abstract": "High-resolution digital elevation model covering the Alpine arc from France to Austria, derived from LiDAR surveys conducted 2022-2023. Spatial resolution 1m, vertical accuracy ±0.15m.",
+  "topicCategory": "elevation",
+  "keyword": "Digital Elevation Model",
+  "originatingControlledVocabulary": "GEMET - INSPIRE themes, version 1.0",
+  "geographicBoundingBox": {"westBoundLongitude": 5.5, "eastBoundLongitude": 17.2, "southBoundLatitude": 43.8, "northBoundLatitude": 48.5},
+  "lineage": "Derived from airborne LiDAR surveys (2022-2023) processed with TerraScan software. Horizontal datum: ETRS89, Vertical datum: EVRS2007.",
+  "conditionsForAccessAndUse": "No conditions apply. Open data under Creative Commons Attribution 4.0.",
+  "limitationsOnPublicAccess": "No limitations on public access.",
+  "responsibleParty": "type=organisation; name=Alpine Survey Consortium; email=data@alpine-survey.eu; role=pointOfContact",
+  "metadataLanguage": "eng",
+  "metadataDate": "2024-02-20",
+  "metadataPointOfContact": "type=person; name=Andrea Bauer; affiliation=Alpine Survey Consortium; email=a.bauer@alpine-survey.eu; role=pointOfContact",
+  "dateOfCreation": "2023-12-01",
+  "spatialRepresentationType": "grid",
+  "spatialResolution": "1"
+}`
+};
+
+document.getElementById('loadExampleBtn').addEventListener('click', () => {
+  document.querySelector('#pasteTab textarea').value = examples.nato;
+  document.querySelector('button[data-bs-target="#pasteTab"]').click();
+});
+document.getElementById('loadDCExampleBtn').addEventListener('click', () => {
+  document.querySelector('#pasteTab textarea').value = examples.dublin_core;
+  document.querySelector('button[data-bs-target="#pasteTab"]').click();
+});
+document.getElementById('loadINSPIREExampleBtn').addEventListener('click', () => {
+  document.querySelector('#pasteTab textarea').value = examples.inspire;
+  document.querySelector('button[data-bs-target="#pasteTab"]').click();
+});
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.querySelector('#pasteTab textarea').value = '';
+});
+
+// Auto-switch to paste tab when typing in upload tab
+document.querySelector('#uploadTab input[type=file]').addEventListener('change', function() {
+  // Keep on upload tab — no action needed
+});
+</script>
+{% endblock %}

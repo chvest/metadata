@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Compatibility Matrix — NATO Metadata Tool{% endblock %}
+
+{% block extra_head %}
+<style>
+  .matrix-table th, .matrix-table td {
+    text-align: center; vertical-align: middle; font-size: 0.78rem;
+    padding: 0.35rem 0.5rem;
+  }
+  .matrix-table th.row-header { text-align: left; min-width: 130px; }
+  .matrix-table td.score-cell {
+    cursor: pointer; transition: opacity 0.15s;
+    font-weight: 600; border-radius: 3px;
+  }
+  .matrix-table td.score-cell:hover { opacity: 0.78; }
+  .score-high   { background: #198754; color: #fff; }
+  .score-good   { background: #20c997; color: #fff; }
+  .score-medium { background: #ffc107; color: #212529; }
+  .score-low    { background: #fd7e14; color: #fff; }
+  .score-none   { background: #dee2e6; color: #6c757d; }
+  .score-self   { background: #e9ecef; color: #9e9e9e; font-style: italic; }
+
+  #crosswalk-panel { display: none; }
+  #crosswalk-panel.visible { display: block; }
+
+  .mapping-exact    { color: #198754; font-weight: 600; }
+  .mapping-similar  { color: #0d6efd; font-weight: 600; }
+  .mapping-partial  { color: #fd7e14; font-weight: 600; }
+  .mapping-none     { color: #adb5bd; }
+
+  .domain-tag {
+    font-size: 0.68rem; padding: 0.15em 0.5em;
+    border-radius: 10px; color: #fff; font-weight: 600;
+  }
+  .domain-tag.nato { background: #003189; }
+  .domain-tag.eu   { background: #003399; }
+  .domain-tag.iso  { background: #006633; }
+  .domain-tag.nist { background: #5c2d82; }
+
+  /* Usage summary table */
+  .usage-table th, .usage-table td {
+    text-align: center; vertical-align: middle;
+    font-size: 0.75rem; padding: 0.3rem 0.4rem;
+  }
+  .usage-table th.row-header { text-align: left; min-width: 110px; font-size: 0.72rem; }
+  .usage-cell {
+    cursor: pointer; transition: opacity 0.15s; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; line-height: 1.2; padding: 0.25rem 0.3rem !important;
+  }
+  .usage-cell:hover { opacity: 0.78; }
+  .usage-required    { background: #003189; color: #fff; }
+  .usage-extends     { background: #0d6efd; color: #fff; }
+  .usage-complements { background: #198754; color: #fff; }
+  .usage-high        { background: #20c997; color: #fff; }
+  .usage-medium      { background: #ffc107; color: #212529; }
+  .usage-low         { background: #fd7e14; color: #fff; }
+  .usage-none        { background: #e9ecef; color: #adb5bd; }
+  .usage-self        { background: #f8f9fa; color: #ccc; font-style: italic; }
+
+  #usage-tooltip {
+    position: fixed; z-index: 9999; max-width: 320px;
+    background: #212529; color: #fff; border-radius: 6px;
+    padding: 0.6rem 0.85rem; font-size: 0.78rem; line-height: 1.4;
+    pointer-events: none; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  #usage-tooltip.visible { display: block; }
+  #usage-tooltip .tt-label { font-weight: 700; margin-bottom: 0.3rem; }
+  #usage-tooltip .tt-suite { font-size: 0.7rem; opacity: 0.75; margin-bottom: 0.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <div class="page-header mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h1 class="fw-bold">Compatibility Matrix</h1>
+        <p class="text-muted mb-0">
+          Can these standards be used together, and to what extent?
+          Hover over any cell in the Usage Summary for a plain-language explanation.
+          Click cells in the Crosswalk table to drill into field-level mappings.
+        </p>
+        <div class="alert alert-light border mt-3 mb-0 py-2 px-3" style="font-size:0.82rem; max-width:700px;">
+          <strong>&#9432; Scores are directional.</strong>
+          A percentage score means: <em>"this fraction of the <strong>row</strong> standard's fields
+          have a defined equivalent in the <strong>column</strong> standard."</em>
+          A narrow standard mapping into a broad one will score low in that direction
+          (few of the broad standard's many fields are covered) but high in reverse
+          (most of the narrow standard's few fields find a match).
+          A large asymmetry between row A→B and column B→A indicates one standard
+          is significantly broader or more specialised than the other.
+        </div>
+      </div>
+      <div class="coverage-legend pt-1">
+        <span class="legend-item"><span class="legend-swatch" style="background:#198754"></span>≥75% High</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#20c997"></span>≥50% Good</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#ffc107"></span>≥25% Medium</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#fd7e14"></span>&lt;25% Low</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#dee2e6"></span>None</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Usage Summary Table ──────────────────────────────────────────────── -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <span class="fw-semibold">Usage Summary</span>
+        <small class="text-muted fw-normal ms-2">Can these standards be used together?</small>
+        <small class="text-muted fw-normal ms-3">
+          &#9432; Percentages read as <em>row &rarr; column</em>:
+          "X% of the <strong>row</strong> standard's fields map into the <strong>column</strong> standard."
+          Scores are not symmetric — a narrow standard mapping into a broad one will score low
+          in that direction but high in reverse.
+        </small>
+      </div>
+      <div class="d-flex gap-2 flex-wrap align-items-center" style="font-size:0.72rem;">
+        <span class="badge usage-required">Must use together</span>
+        <span class="badge usage-extends">Extends / profiles</span>
+        <span class="badge usage-complements">Complements</span>
+        <span class="badge usage-high">High crosswalk</span>
+        <span class="badge usage-medium">Partial crosswalk</span>
+        <span class="badge usage-low">Limited crosswalk</span>
+        <span class="badge usage-none" style="border:1px solid #dee2e6;">No crosswalk</span>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered usage-table mb-0">
+          <thead>
+            <tr>
+              <th class="row-header">↓ Source &nbsp;/&nbsp; Target →</th>
+              {% for std in standards %}
+              <th title="{{ std.full_name }}">
+                <span class="domain-tag {{ std.domain | lower }}">{{ std.domain }}</span><br>
+                {{ std.name }}
+              </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for src in standards %}
+            <tr>
+              <th class="row-header text-start">
+                <span class="domain-tag {{ src.domain | lower }}">{{ src.domain }}</span>
+                {{ src.name }}
+              </th>
+              {% for tgt in standards %}
+                {% set cell = pairwise.get(src.id, {}).get(tgt.id, {}) %}
+                {% set cat = cell.get('category', 'none') %}
+                {% if cat == 'self' %}
+                <td class="usage-cell usage-self">—</td>
+                {% else %}
+                <td class="usage-cell usage-{{ cat }}"
+                    data-label="{{ cell.get('label','') | e }}"
+                    data-desc="{{ cell.get('description','') | e }}"
+                    data-suite="{{ cell.get('suite_name','') | e }}"
+                    data-src="{{ src.id }}"
+                    data-tgt="{{ tgt.id }}"
+                    data-src-name="{{ src.name | e }}"
+                    data-tgt-name="{{ tgt.name | e }}"
+                    onmouseenter="showTooltip(event,this)"
+                    onmouseleave="hideTooltip()"
+                    onclick="onUsageClick(this)">
+                  {% if cat == 'required' %}&#9679;&#9679;
+                  {% elif cat == 'extends' %}&#9679;&#9679;
+                  {% elif cat == 'complements' %}&#9679;&#9675;
+                  {% elif cat == 'high' %}{{ (cell.get('score',0)*100)|int }}%
+                  {% elif cat == 'medium' %}{{ (cell.get('score',0)*100)|int }}%
+                  {% elif cat == 'low' %}{{ (cell.get('score',0)*100)|int }}%
+                  {% else %}—{% endif %}
+                </td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tooltip element -->
+  <div id="usage-tooltip">
+    <div class="tt-label" id="tt-label"></div>
+    <div class="tt-suite" id="tt-suite"></div>
+    <div id="tt-desc"></div>
+    <div class="mt-2" style="font-size:0.68rem;opacity:0.6;">Click to view crosswalk detail below</div>
+  </div>
+
+  <!-- Plotly interactive heatmap -->
+  {% if heatmap_html %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+      Interactive Heatmap
+      <small class="text-muted fw-normal ms-2">Hover over cells for details</small>
+    </div>
+    <div class="card-body p-2">
+      {{ heatmap_html | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Static compatibility table -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+      Detailed Compatibility Table
+      <small class="text-muted fw-normal ms-2">Click a cell to view field-level crosswalk</small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered matrix-table mb-0" id="matrixTable">
+          <thead>
+            <tr>
+              <th class="row-header">Source ↓ &nbsp;/&nbsp; Target →</th>
+              {% for std in standards %}
+              <th>
+                <span class="domain-tag {{ std.domain | lower }}">{{ std.domain }}</span><br>
+                <span title="{{ std.full_name }}">{{ std.name }}</span>
+              </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for src in standards %}
+            <tr>
+              <th class="row-header text-start">
+                <span class="domain-tag {{ src.domain | lower }}">{{ src.domain }}</span>
+                {{ src.name }}
+              </th>
+              {% for tgt in standards %}
+                {% if src.id == tgt.id %}
+                <td class="score-self">—</td>
+                {% else %}
+                  {% set score = matrix.get(src.id, {}).get(tgt.id, 0) %}
+                  {% set pct = (score * 100) | int %}
+                  <td class="score-cell
+                    {% if pct >= 75 %}score-high
+                    {% elif pct >= 50 %}score-good
+                    {% elif pct >= 25 %}score-medium
+                    {% elif pct > 0 %}score-low
+                    {% else %}score-none{% endif %}"
+                    data-src="{{ src.id }}"
+                    data-tgt="{{ tgt.id }}"
+                    data-src-name="{{ src.name }}"
+                    data-tgt-name="{{ tgt.name }}"
+                    title="Click to see crosswalk: {{ src.name }} → {{ tgt.name }}">
+                    {{ pct }}%
+                  </td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crosswalk detail panel (filled via JS/AJAX) -->
+  <div id="crosswalk-panel" class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold" id="crosswalk-title">Crosswalk Detail</span>
+      <div class="d-flex gap-2">
+        <a id="crosswalk-report-link" href="#" class="btn btn-sm btn-outline-primary">
+          Full Report
+        </a>
+        <a id="crosswalk-pairwise-link" href="#" class="btn btn-sm btn-outline-secondary">
+          Compare Two &#8644;
+        </a>
+        <button class="btn btn-sm btn-outline-secondary" onclick="closeCrosswalk()">Close</button>
+      </div>
+    </div>
+    <div class="card-body" id="crosswalk-body">
+      <p class="text-muted">Loading…</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Usage summary tooltip ────────────────────────────────────────────────
+var tooltip = document.getElementById('usage-tooltip');
+
+function showTooltip(event, cell) {
+  var label = cell.dataset.label || '';
+  var desc  = cell.dataset.desc  || '';
+  var suite = cell.dataset.suite || '';
+  document.getElementById('tt-label').textContent = label;
+  document.getElementById('tt-suite').textContent = suite ? 'Suite: ' + suite : '';
+  document.getElementById('tt-suite').style.display = suite ? '' : 'none';
+  document.getElementById('tt-desc').textContent  = desc;
+  tooltip.classList.add('visible');
+  positionTooltip(event);
+}
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+document.addEventListener('mousemove', function(e) {
+  if (tooltip.classList.contains('visible')) positionTooltip(e);
+});
+
+function positionTooltip(e) {
+  var x = e.clientX + 14, y = e.clientY + 14;
+  if (x + 330 > window.innerWidth)  x = e.clientX - 330;
+  if (y + 120 > window.innerHeight) y = e.clientY - 120;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+function onUsageClick(cell) {
+  // Suite-relationship cells link to the suite page instead of crosswalk
+  var cat = cell.className.match(/usage-(required|extends|complements)/);
+  if (cat) {
+    // find suite link from tooltip data — fall back to crosswalk
+    var suiteLinks = {{ all_suites | map(attribute='id') | list | tojson }};
+    // just open the crosswalk so user can see details
+  }
+  var src = cell.dataset.src, tgt = cell.dataset.tgt;
+  var srcName = cell.dataset.srcName, tgtName = cell.dataset.tgtName;
+  if (src && tgt) loadCrosswalk(src, tgt, srcName, tgtName);
+}
+
+// ── Crosswalk table click ────────────────────────────────────────────────
+document.querySelectorAll('.score-cell').forEach(function(cell) {
+  cell.addEventListener('click', function() {
+    var src = this.dataset.src;
+    var tgt = this.dataset.tgt;
+    var srcName = this.dataset.srcName;
+    var tgtName = this.dataset.tgtName;
+    loadCrosswalk(src, tgt, srcName, tgtName);
+  });
+});
+
+function loadCrosswalk(src, tgt, srcName, tgtName) {
+  var panel = document.getElementById('crosswalk-panel');
+  var body = document.getElementById('crosswalk-body');
+  var title = document.getElementById('crosswalk-title');
+  var reportLink = document.getElementById('crosswalk-report-link');
+  var pairwiseLink = document.getElementById('crosswalk-pairwise-link');
+
+  title.textContent = 'Crosswalk: ' + srcName + ' → ' + tgtName;
+  reportLink.href = '/report/' + src;
+  pairwiseLink.href = '/pairwise/' + src + '/' + tgt;
+  body.innerHTML = '<p class="text-muted">Loading…</p>';
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/api/crosswalk/' + src + '/' + tgt)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var mappings = Array.isArray(data) ? data : (data.mappings || []);
+      body.innerHTML = renderCrosswalk(mappings, srcName, tgtName);
+    })
+    .catch(function(e) {
+      body.innerHTML = '<div class="alert alert-warning">Could not load crosswalk data.</div>';
+    });
+}
+
+function closeCrosswalk() {
+  document.getElementById('crosswalk-panel').classList.remove('visible');
+}
+
+function renderCrosswalk(data, srcName, tgtName) {
+  if (!data || data.length === 0) {
+    return '<p class="text-muted">No crosswalk mappings defined between these standards.</p>';
+  }
+
+  var typeCount = { exact: 0, similar: 0, partial: 0, none: 0 };
+  data.forEach(function(m) { if (typeCount[m.mapping_type] !== undefined) typeCount[m.mapping_type]++; });
+
+  var summary = '<div class="d-flex gap-3 mb-3 flex-wrap">'
+    + badge('Exact', typeCount.exact, '#198754')
+    + badge('Similar', typeCount.similar, '#0d6efd')
+    + badge('Partial', typeCount.partial, '#fd7e14')
+    + badge('No equivalent', typeCount.none, '#6c757d')
+    + '</div>';
+
+  var rows = data.map(function(m) {
+    var cls = 'mapping-' + m.mapping_type;
+    var tgtCell = m.target_field
+      ? '<code>' + esc(m.target_field) + '</code>'
+      : '<span class="text-muted fst-italic">No equivalent</span>';
+    return '<tr>'
+      + '<td><code>' + esc(m.source_field) + '</code></td>'
+      + '<td>' + esc(m.source_description || '') + '</td>'
+      + '<td class="' + cls + '">' + tgtCell + '</td>'
+      + '<td>' + esc(m.target_description || '') + '</td>'
+      + '<td><span class="' + cls + '">' + esc(m.mapping_type) + '</span></td>'
+      + '<td><small class="text-muted">' + esc(m.notes || '') + '</small></td>'
+      + '</tr>';
+  }).join('');
+
+  return summary
+    + '<div class="table-responsive">'
+    + '<table class="table table-sm table-hover crosswalk-table">'
+    + '<thead><tr>'
+    + '<th>' + esc(srcName) + ' field</th>'
+    + '<th>Source description</th>'
+    + '<th>' + esc(tgtName) + ' equivalent</th>'
+    + '<th>Target description</th>'
+    + '<th>Mapping type</th>'
+    + '<th>Notes</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table></div>';
+}
+
+function badge(label, count, color) {
+  return '<span class="badge rounded-pill" style="background:' + color + '">'
+    + count + ' ' + label + '</span>';
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

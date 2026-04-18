@@ -1,0 +1,539 @@
+/* ── NATO Metadata Standards Tool — Custom CSS ───────────────────────────── */
+
+/* ── Colour palette ─────────────────────────────────────────────────────── */
+:root {
+  --nato-blue:      #003189;
+  --nato-blue-dark: #001f5e;
+  --nato-blue-mid:  #0044c8;
+  --eu-gold:        #FFCC00;
+  --eu-blue:        #003399;
+  --iso-green:      #006633;
+  --nist-purple:    #5c2d82;
+  --mandatory-red:  #dc3545;
+  --optional-grey:  #6c757d;
+  --conditional-blue: #0d6efd;
+}
+
+/* ── Navbar ─────────────────────────────────────────────────────────────── */
+.nato-navbar {
+  background: linear-gradient(90deg, var(--nato-blue-dark), var(--nato-blue));
+  border-bottom: 3px solid var(--eu-gold);
+  padding: 0.6rem 0;
+}
+.nato-navbar .navbar-brand {
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+.nato-shield {
+  color: var(--eu-gold);
+  font-size: 1.3rem;
+}
+.nato-navbar .nav-link {
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.75rem !important;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.nato-navbar .nav-link:hover,
+.nato-navbar .nav-link.active {
+  background: rgba(255,255,255,0.15);
+  color: #fff !important;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.nato-footer {
+  background: #f8f9fa;
+  border-top: 2px solid #dee2e6;
+}
+
+/* ── Hero section ───────────────────────────────────────────────────────── */
+.hero-section {
+  background: linear-gradient(135deg, var(--nato-blue-dark) 0%, var(--nato-blue-mid) 100%);
+  padding: 3.5rem 0 3rem;
+}
+.hero-section .opacity-90 { opacity: 0.9; }
+
+/* Standards cloud in hero */
+.standards-cloud { padding: 1rem; }
+.std-badge {
+  display: inline-block;
+  margin: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0.92;
+}
+.std-badge.domain-nato  { background: var(--nato-blue); }
+.std-badge.domain-eu    { background: var(--eu-blue); }
+.std-badge.domain-iso   { background: var(--iso-green); }
+.std-badge.domain-nist  { background: var(--nist-purple); }
+
+/* ── Feature cards ──────────────────────────────────────────────────────── */
+.feature-card { transition: transform 0.18s, box-shadow 0.18s; }
+.feature-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important; }
+.feature-icon { font-size: 2.2rem; }
+.text-nato { color: var(--nato-blue) !important; }
+.btn-nato { background: var(--nato-blue); color: #fff; border: none; }
+.btn-nato:hover { background: var(--nato-blue-dark); color: #fff; }
+
+/* ── Domain cards (index) ───────────────────────────────────────────────── */
+.domain-card { transition: transform 0.18s; }
+.domain-card:hover { transform: translateY(-2px); }
+.domain-header-nato   { background: var(--nato-blue); }
+.domain-header-eu     { background: var(--eu-blue); }
+.domain-header-iso    { background: var(--iso-green); }
+.domain-header-nist   { background: var(--nist-purple); }
+.domain-card-nato  { border-top: 3px solid var(--nato-blue) !important; }
+.domain-card-eu    { border-top: 3px solid var(--eu-blue) !important; }
+.domain-card-iso   { border-top: 3px solid var(--iso-green) !important; }
+.domain-card-nist  { border-top: 3px solid var(--nist-purple) !important; }
+
+/* ── Stat cards ─────────────────────────────────────────────────────────── */
+.stat-card {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  transition: box-shadow 0.15s;
+}
+.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.stat-number { font-size: 2rem; color: var(--nato-blue); }
+
+/* ── Page headers ───────────────────────────────────────────────────────── */
+.page-header {
+  padding: 1.25rem 0 1rem;
+  border-bottom: 2px solid #e9ecef;
+}
+.page-header h1 { color: var(--nato-blue-dark); }
+
+/* ── Obligation badges ──────────────────────────────────────────────────── */
+.badge-mandatory   { background: var(--mandatory-red); color: #fff; }
+.badge-optional    { background: var(--optional-grey); color: #fff; }
+.badge-conditional { background: var(--conditional-blue); color: #fff; }
+.badge-deprecated  { background: #fd7e14; color: #fff; }
+.badge-retired     { background: #212529; color: #fff; }
+.badge-prohibited  { background: #6f42c1; color: #fff; }
+
+.obligation-badge {
+  font-size: 0.7rem;
+  padding: 0.2em 0.55em;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Domain indicator dots ──────────────────────────────────────────────── */
+.domain-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+.domain-dot.domain-nato  { background: var(--nato-blue); }
+.domain-dot.domain-eu    { background: var(--eu-blue); }
+.domain-dot.domain-iso   { background: var(--iso-green); }
+.domain-dot.domain-nist  { background: var(--nist-purple); }
+
+/* ── Detect page ────────────────────────────────────────────────────────── */
+.confidence-bar-wrap {
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 18px;
+}
+.confidence-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--nato-blue), var(--nato-blue-mid));
+  transition: width 0.5s ease;
+  border-radius: 4px;
+  min-width: 2px;
+}
+.confidence-bar.high   { background: linear-gradient(90deg, #198754, #20c997); }
+.confidence-bar.medium { background: linear-gradient(90deg, #fd7e14, #ffc107); }
+.confidence-bar.low    { background: linear-gradient(90deg, #6c757d, #adb5bd); }
+
+.top-match-card {
+  border-left: 5px solid var(--nato-blue);
+  background: linear-gradient(90deg, #f0f4ff, #fff);
+}
+
+/* ── Generate page ──────────────────────────────────────────────────────── */
+.code-block {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  overflow-x: auto;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.code-block::-webkit-scrollbar { width: 6px; height: 6px; }
+.code-block::-webkit-scrollbar-track { background: #2a2a3e; }
+.code-block::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Compare / matrix page ──────────────────────────────────────────────── */
+.matrix-cell-exact    { background: #198754; color: #fff; }
+.matrix-cell-similar  { background: #0d6efd; color: #fff; }
+.matrix-cell-partial  { background: #fd7e14; color: #fff; }
+.matrix-cell-none     { background: #f8f9fa; color: #adb5bd; }
+.matrix-cell-self     { background: #e9ecef; color: #6c757d; }
+
+.crosswalk-table th { background: #f1f3f5; font-size: 0.8rem; }
+.crosswalk-table td { font-size: 0.82rem; vertical-align: middle; }
+
+/* ── Report pages ───────────────────────────────────────────────────────── */
+.field-table th { background: var(--nato-blue); color: #fff; font-size: 0.8rem; }
+.field-table td { font-size: 0.82rem; vertical-align: middle; }
+.field-table tr:hover { background: #f8f9fa; }
+
+.coverage-legend { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; }
+.legend-swatch {
+  width: 14px; height: 14px; border-radius: 2px;
+  display: inline-block;
+}
+.legend-exact    { background: #198754; }
+.legend-similar  { background: #0d6efd; }
+.legend-partial  { background: #fd7e14; }
+.legend-none     { background: #adb5bd; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+.nav-tabs .nav-link.active { border-top: 3px solid var(--nato-blue); font-weight: 600; }
+.nav-tabs .nav-link { color: #495057; }
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+pre { white-space: pre-wrap; word-break: break-word; }
+.text-nato { color: var(--nato-blue) !important; }
+.border-nato { border-color: var(--nato-blue) !important; }
+.bg-nato { background: var(--nato-blue) !important; }
+
+/* ── Responsive tweaks ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hero-section { padding: 2rem 0 1.5rem; }
+  .hero-section h1 { font-size: 1.8rem; }
+  .stat-number { font-size: 1.5rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE
+   Uses Bootstrap 5.3 data-bs-theme="dark" on <html> — Bootstrap handles its
+   own components; we override custom classes here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dark mode toggle button ────────────────────────────────────────────── */
+#dark-mode-toggle {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.85);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+#dark-mode-toggle:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.6);
+  color: #fff;
+}
+
+/* ── Base overrides ─────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] body {
+  background-color: #0f1117;
+  color: #e2e8f0;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .nato-footer {
+  background: #161b27;
+  border-top-color: #2d3748;
+}
+
+/* ── Page header ────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .page-header {
+  border-bottom-color: #2d3748;
+}
+[data-bs-theme="dark"] .page-header h1 {
+  color: #93c5fd;
+}
+
+/* ── Stat cards ─────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .stat-card {
+  background: #1e2535;
+  border-color: #2d3748;
+}
+[data-bs-theme="dark"] .stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+[data-bs-theme="dark"] .stat-number { color: #93c5fd; }
+
+/* ── Hero section — keep dark gradient as-is ────────────────────────────── */
+[data-bs-theme="dark"] .hero-section {
+  background: linear-gradient(135deg, #060d1f 0%, var(--nato-blue-dark) 100%);
+}
+
+/* ── Feature cards ──────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .feature-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5) !important;
+}
+
+/* ── Detect page ────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .confidence-bar-wrap { background: #2d3748; }
+[data-bs-theme="dark"] .top-match-card {
+  border-left-color: #93c5fd;
+  background: linear-gradient(90deg, #1a2540, #1e2535);
+}
+
+/* ── Matrix cells ───────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .matrix-cell-none  { background: #1e2535; color: #6b7280; }
+[data-bs-theme="dark"] .matrix-cell-self  { background: #161b27; color: #4b5563; }
+[data-bs-theme="dark"] .crosswalk-table th { background: #1e2535; color: #cbd5e1; }
+
+/* ── Field tables ───────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .field-table tr:hover { background: #1e2535; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .nav-tabs .nav-link { color: #94a3b8; }
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+  border-top-color: #93c5fd;
+  background-color: #1e2535;
+  color: #e2e8f0;
+  border-color: #2d3748 #2d3748 #1e2535;
+}
+
+/* ── Collapsible section headers ────────────────────────────────────────── */
+[data-bs-theme="dark"] .sec-toggle:hover { background: #1e2535 !important; }
+[data-bs-theme="dark"] .card-header { border-bottom-color: #2d3748; }
+
+/* ── Methodology page ───────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .method-section {
+  border-left-color: #93c5fd;
+}
+[data-bs-theme="dark"] .method-section h3 { color: #93c5fd; }
+
+/* ── Stat boxes (methodology page) ─────────────────────────────────────── */
+[data-bs-theme="dark"] .stat-box {
+  background: #1e2535;
+  border-color: #2d3748;
+}
+[data-bs-theme="dark"] .stat-box .num { color: #93c5fd; }
+[data-bs-theme="dark"] .stat-box .lbl { color: #94a3b8; }
+
+/* ── Callout boxes ──────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .callout-info {
+  background: #1a2a3a;
+  border-left-color: #3b82f6;
+  color: #bfdbfe;
+}
+[data-bs-theme="dark"] .callout-warning {
+  background: #2a2210;
+  border-left-color: #d97706;
+  color: #fde68a;
+}
+
+/* ── Pairwise page — score pills & conflict cards ───────────────────────── */
+[data-bs-theme="dark"] .score-high   { background: #166534; color: #bbf7d0; }
+[data-bs-theme="dark"] .score-medium { background: #713f12; color: #fef08a; }
+[data-bs-theme="dark"] .score-low    { background: #7c2d12; color: #fed7aa; }
+[data-bs-theme="dark"] .score-none   { background: #1e2535; color: #94a3b8; }
+
+[data-bs-theme="dark"] .conflict-blocking  {
+  background: #2d1417 !important;
+  border-left-color: #f87171 !important;
+}
+[data-bs-theme="dark"] .conflict-lossy     {
+  background: #2d2200 !important;
+  border-left-color: #fbbf24 !important;
+}
+[data-bs-theme="dark"] .conflict-transform {
+  background: #0c2233 !important;
+  border-left-color: #38bdf8 !important;
+}
+
+/* ── Mapping type colours ───────────────────────────────────────────────── */
+[data-bs-theme="dark"] .mapping-exact   { color: #4ade80; }
+[data-bs-theme="dark"] .mapping-similar { color: #60a5fa; }
+[data-bs-theme="dark"] .mapping-partial { color: #fb923c; }
+[data-bs-theme="dark"] .mapping-none    { color: #6b7280; }
+
+/* ── Field row highlights (pairwise) ───────────────────────────────────── */
+[data-bs-theme="dark"] .field-row-ab { border-left-color: #60a5fa; }
+[data-bs-theme="dark"] .field-row-ba { border-left-color: #94a3b8; }
+
+/* ── Round-trip fidelity colours ────────────────────────────────────────── */
+[data-bs-theme="dark"] .rt-survives  { color: #4ade80; }
+[data-bs-theme="dark"] .rt-degraded  { color: #fb923c; }
+[data-bs-theme="dark"] .rt-lost      { color: #f87171; }
+
+/* ── Bootstrap table striping override ─────────────────────────────────── */
+[data-bs-theme="dark"] .table-light thead th,
+[data-bs-theme="dark"] .table-light {
+  --bs-table-bg: #1e2535;
+  --bs-table-color: #cbd5e1;
+  color: #cbd5e1;
+  background-color: #1e2535;
+}
+[data-bs-theme="dark"] .table {
+  --bs-table-striped-bg: #1a2030;
+  --bs-table-hover-bg: #1e2535;
+}
+
+/* ── Inline background overrides for report/pairwise section headers ────── */
+/* These appear as style="background:#f0f4ff" in generated HTML */
+[data-bs-theme="dark"] [style*="background:#f0f4ff"],
+[data-bs-theme="dark"] [style*="background: #f0f4ff"] {
+  background: #1a2540 !important;
+}
+[data-bs-theme="dark"] [style*="background:#f8f9fa"],
+[data-bs-theme="dark"] [style*="background: #f8f9fa"] {
+  background: #1e2535 !important;
+  color: #cbd5e1;
+}
+[data-bs-theme="dark"] [style*="background:#fff3cd"],
+[data-bs-theme="dark"] [style*="background: #fff3cd"] {
+  background: #2d2200 !important;
+}
+[data-bs-theme="dark"] [style*="background:#fde8ea"],
+[data-bs-theme="dark"] [style*="background: #fde8ea"] {
+  background: #2d1417 !important;
+}
+[data-bs-theme="dark"] [style*="background:#cff4fc"],
+[data-bs-theme="dark"] [style*="background: #cff4fc"] {
+  background: #0c2233 !important;
+}
+[data-bs-theme="dark"] [style*="background:#e0f4fb"],
+[data-bs-theme="dark"] [style*="background: #e0f4fb"] {
+  background: #0c2233 !important;
+}
+[data-bs-theme="dark"] [style*="background:#fff8e1"],
+[data-bs-theme="dark"] [style*="background: #fff8e1"] {
+  background: #2d2200 !important;
+}
+
+/* ── Cards default ──────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .card {
+  --bs-card-bg: #1e2535;
+  --bs-card-border-color: #2d3748;
+}
+[data-bs-theme="dark"] .card-header {
+  background-color: #161b27;
+  color: #e2e8f0;
+}
+
+/* ── Code elements ──────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] code {
+  background: #2d3748;
+  color: #93c5fd;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+[data-bs-theme="dark"] pre code { background: transparent; padding: 0; }
+
+/* ── TOC links (methodology) ────────────────────────────────────────────── */
+[data-bs-theme="dark"] .toc a { color: #93c5fd; }
+[data-bs-theme="dark"] .toc a:hover { color: #bfdbfe; }
+
+/* ── Form controls ──────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .form-select,
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-control:focus {
+  background-color: #1e2535;
+  border-color: #2d3748;
+  color: #e2e8f0;
+}
+
+/* ── Dropdown menus ─────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .dropdown-menu {
+  background-color: #1e2535;
+  border-color: #2d3748;
+}
+[data-bs-theme="dark"] .dropdown-item { color: #e2e8f0; }
+[data-bs-theme="dark"] .dropdown-item:hover { background-color: #2d3748; }
+
+/* ── Suite / verdict banner ─────────────────────────────────────────────── */
+[data-bs-theme="dark"] [style*="background:#e8f5e9"],
+[data-bs-theme="dark"] [style*="background: #e8f5e9"] { background: #0d2b1a !important; }
+[data-bs-theme="dark"] [style*="background:#fff9e6"],
+[data-bs-theme="dark"] [style*="background: #fff9e6"] { background: #2a1f00 !important; }
+[data-bs-theme="dark"] [style*="background:#fce4ec"],
+[data-bs-theme="dark"] [style*="background: #fce4ec"] { background: #2d0f18 !important; }
+[data-bs-theme="dark"] [style*="background:#e3f2fd"],
+[data-bs-theme="dark"] [style*="background: #e3f2fd"] { background: #0d1f2d !important; }
+[data-bs-theme="dark"] [style*="background:#f3e5f5"],
+[data-bs-theme="dark"] [style*="background: #f3e5f5"] { background: #1e0f2d !important; }
+
+/* ── Missing inline background overrides ────────────────────────────────── */
+/* Blocking card bg (#f8d7da) — was absent from earlier list */
+[data-bs-theme="dark"] [style*="background:#f8d7da"],
+[data-bs-theme="dark"] [style*="background: #f8d7da"] { background: #2d1417 !important; }
+
+/* Light blue-grey pairwise standard-header box */
+[data-bs-theme="dark"] .std-header {
+  background: #1a2540 !important;
+  border-color: #2d3748 !important;
+}
+
+/* White backgrounds inside reporter-generated tables and vocab boxes.
+   Semicolon suffix distinguishes "#fff;" from "#fff3cd", "#fff8e1", etc. */
+[data-bs-theme="dark"] [style*="background:#fff;"],
+[data-bs-theme="dark"] [style*="background: #fff;"] {
+  background: #1e2535 !important;
+}
+
+/* Auto-detected badge and type-label chips */
+[data-bs-theme="dark"] [style*="background:#e9ecef"],
+[data-bs-theme="dark"] [style*="background: #e9ecef"] {
+  background: #2d3748 !important;
+}
+
+/* Compare legend "None" swatch — light grey almost invisible on dark bg */
+[data-bs-theme="dark"] [style*="background:#dee2e6"],
+[data-bs-theme="dark"] [style*="background: #dee2e6"] {
+  background: #374151 !important;
+}
+
+/* ── Inline text colours that become unreadable on dark backgrounds ───────── */
+/* Blocking card title (dark maroon) */
+[data-bs-theme="dark"] [style*="color:#842029"] { color: #fca5a5 !important; }
+/* Lossy card title + badge text (dark amber) */
+[data-bs-theme="dark"] [style*="color:#664d03"] { color: #fde68a !important; }
+/* Transform card title + badge text (dark teal) */
+[data-bs-theme="dark"] [style*="color:#055160"] { color: #7dd3fc !important; }
+/* General card body / description text (near-black) */
+[data-bs-theme="dark"] [style*="color:#212529"] { color: #e2e8f0 !important; }
+/* Secondary label text (dark grey) */
+[data-bs-theme="dark"] [style*="color:#495057"] { color: #94a3b8 !important; }
+
+/* Domain colours used as inline text — dark on dark background after bg override */
+[data-bs-theme="dark"] [style*="color:#003189"] { color: #93c5fd !important; }  /* NATO  */
+[data-bs-theme="dark"] [style*="color:#003399"] { color: #93c5fd !important; }  /* EU    */
+[data-bs-theme="dark"] [style*="color:#006633"] { color: #6ee7b7 !important; }  /* ISO   */
+[data-bs-theme="dark"] [style*="color:#5c2d82"] { color: #c4b5fd !important; }  /* NIST  */
+[data-bs-theme="dark"] [style*="color:#e63946"] { color: #fca5a5 !important; }  /* other */
+
+/* ── Code chips inside reporter-generated conflict cards ─────────────────── */
+/* rgba(0,0,0,0.08) becomes near-transparent on dark backgrounds */
+[data-bs-theme="dark"] [style*="rgba(0,0,0,0.08)"] {
+  background: rgba(255,255,255,0.12) !important;
+  color: #93c5fd !important;
+}
+
+/* ── Table & box borders ─────────────────────────────────────────────────── */
+[data-bs-theme="dark"] [style*="border:1px solid #dee2e6"],
+[data-bs-theme="dark"] [style*="border: 1px solid #dee2e6"] {
+  border-color: #2d3748 !important;
+}
+
+/* ── Pairwise conflict card text ─────────────────────────────────────────── */
+/* Cards have dark backgrounds from the rules above but no explicit text colour */
+[data-bs-theme="dark"] .conflict-blocking,
+[data-bs-theme="dark"] .conflict-lossy,
+[data-bs-theme="dark"] .conflict-transform { color: #e2e8f0; }
+[data-bs-theme="dark"] .conflict-blocking .text-muted,
+[data-bs-theme="dark"] .conflict-lossy .text-muted,
+[data-bs-theme="dark"] .conflict-transform .text-muted { color: #94a3b8 !important; }

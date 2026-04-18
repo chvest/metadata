@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ std.name }} Report — NATO Metadata Tool{% endblock %}
+
+{% block extra_head %}
+<style>
+.sec-toggle {
+  cursor: pointer; user-select: none;
+  transition: background 0.15s;
+}
+.sec-toggle:hover { background: #e9ecef !important; }
+.sec-chevron {
+  font-size: 0.9rem; color: #6c757d;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.sec-toggle[aria-expanded="false"] .sec-chevron {
+  transform: rotate(-90deg);
+}
+.suite-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0.3em 0.8em; border-radius: 20px;
+  font-size: 0.78rem; font-weight: 600; color: #fff;
+  text-decoration: none; transition: opacity 0.15s;
+}
+.suite-pill:hover { opacity: 0.82; color: #fff; }
+.rel-requires    { background: #dc3545; }
+.rel-extends     { background: #0d6efd; }
+.rel-complements { background: #198754; }
+.rel-anchor      { background: #6c757d; }
+.sibling-card {
+  border-left: 4px solid #dee2e6;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sibling-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <!-- Page header -->
+  <div class="page-header mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge rounded-pill text-white"
+                style="background:
+                  {% if std.domain == 'NATO' %}#003189
+                  {% elif std.domain == 'EU' %}#003399
+                  {% elif std.domain == 'ISO' %}#006633
+                  {% else %}#5c2d82{% endif %}">
+            {{ std.domain }}
+          </span>
+          {% for suite in suites %}
+          <a href="{{ url_for('suite_view', suite_id=suite.id) }}"
+             class="suite-pill" style="background:{{ suite.color }}">
+            <span style="font-size:0.9em">&#9664;</span> {{ suite.name }}
+          </a>
+          {% endfor %}
+        </div>
+        <h1 class="fw-bold mb-1">{{ std.name }}</h1>
+        <p class="text-muted mb-0">{{ std.full_name }}</p>
+        <small class="text-muted">{{ std.version }} &middot; {{ std.organization }}</small>
+      </div>
+      <div class="d-flex gap-2 flex-wrap align-items-start">
+        <a href="{{ url_for('report_pdf', standard_id=std.id) }}"
+           class="btn btn-danger btn-sm">
+          Download PDF
+        </a>
+        <a href="{{ url_for('generate_view') }}" class="btn btn-outline-secondary btn-sm">
+          Generate Example
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suite siblings panel (only shown when this standard is part of a suite) -->
+  {% if siblings %}
+  <div class="card shadow-sm mb-4 border-0 bg-light">
+    <div class="card-body py-3">
+      <h6 class="fw-bold mb-3">
+        &#128279; Related Standards
+        <small class="text-muted fw-normal ms-1">— part of the following suites</small>
+      </h6>
+      <div class="row g-3">
+        {% for sib in siblings %}
+        <div class="col-md-6 col-lg-4">
+          <div class="sibling-card card border-0 shadow-sm h-100 p-3"
+               style="border-left-color: {{ sib.suite_color }} !important;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <a href="{{ url_for('suite_view', suite_id=sib.suite_id) }}"
+                 class="text-decoration-none">
+                <small class="fw-semibold" style="color:{{ sib.suite_color }}">
+                  {{ sib.suite_name }}
+                </small>
+              </a>
+              <span class="badge rel-{{ sib.relationship }} rounded-pill"
+                    style="font-size:0.65rem">
+                {{ sib.relationship }}
+              </span>
+            </div>
+            <strong class="small">
+              <a href="{{ url_for('report_view', standard_id=sib.standard_id) }}"
+                 class="text-decoration-none text-dark">
+                {{ sib.standard_id | upper | replace('_', ' ') }}
+              </a>
+            </strong>
+            <p class="text-muted mb-2" style="font-size:0.75rem">{{ sib.role }}</p>
+            <div class="d-flex gap-2 mt-auto">
+              <a href="{{ url_for('report_view', standard_id=sib.standard_id) }}"
+                 class="btn btn-outline-secondary btn-sm py-0" style="font-size:0.72rem">
+                Report
+              </a>
+              <a href="{{ url_for('suite_view', suite_id=sib.suite_id) }}"
+                 class="btn btn-sm py-0 text-white" style="background:{{ sib.suite_color }};font-size:0.72rem;">
+                Suite
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Embedded compatibility report -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      {{ report_html | safe }}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

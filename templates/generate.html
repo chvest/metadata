@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Generate Metadata — NATO Metadata Tool{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="page-header mb-4">
+    <h1 class="fw-bold">Generate Example Metadata</h1>
+    <p class="text-muted">
+      Select a standard and options, then generate a realistic example metadata record
+      with well-formed fake values in both JSON and XML formats.
+    </p>
+  </div>
+
+  <!-- Generation form -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST" id="generateForm">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label fw-semibold">Select Standard</label>
+            <select name="standard_id" class="form-select" id="standardSelect">
+              {% for domain in ['NATO', 'EU', 'ISO', 'NIST'] %}
+              <optgroup label="{{ domain }}">
+                {% for std in standards_by_domain.get(domain, []) %}
+                <option value="{{ std.id }}"
+                  {% if selected_standard and selected_standard.id == std.id %}selected{% endif %}>
+                  {{ std.name }} — {{ std.full_name[:50] }}{% if std.full_name|length > 50 %}…{% endif %}
+                </option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Options</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_optional"
+                     id="inclOpt" {% if include_optional %}checked{% endif %}>
+              <label class="form-check-label small" for="inclOpt">Include optional fields</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_conditional"
+                     id="inclCond" {% if include_conditional %}checked{% endif %}>
+              <label class="form-check-label small" for="inclCond">Include conditional fields</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-nato px-4 w-100">
+              Generate Example
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  {% if selected_standard %}
+  <!-- Standard info card -->
+  <div class="card border-0 shadow-sm mb-3 standard-info-card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <span class="badge rounded-pill text-white"
+                  style="background:
+                    {% if selected_standard.domain == 'NATO' %}#003189
+                    {% elif selected_standard.domain == 'EU' %}#003399
+                    {% elif selected_standard.domain == 'ISO' %}#006633
+                    {% else %}#5c2d82{% endif %}">
+              {{ selected_standard.domain }}
+            </span>
+            {% for suite in selected_suites %}
+            <a href="{{ url_for('suite_view', suite_id=suite.id) }}"
+               class="badge text-decoration-none text-white"
+               style="background:{{ suite.color }}; font-size:0.72rem;"
+               title="Part of: {{ suite.name }}">
+              &#9664; {{ suite.name }}
+            </a>
+            {% endfor %}
+          </div>
+          <h4 class="mt-1 mb-1 fw-bold">{{ selected_standard.name }}</h4>
+          <p class="text-muted mb-1">{{ selected_standard.full_name }}</p>
+          <small class="text-muted">
+            {{ selected_standard.version }} &middot; {{ selected_standard.organization }}
+          </small>
+        </div>
+        <div class="text-end">
+          <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <span class="badge bg-danger">
+              {{ selected_standard.get_mandatory_fields()|length }} Mandatory
+            </span>
+            <span class="badge bg-warning text-dark">
+              {{ selected_standard.get_conditional_fields()|length }} Conditional
+            </span>
+            <span class="badge bg-secondary">
+              {{ selected_standard.get_optional_fields()|length }} Optional
+            </span>
+          </div>
+          <a href="{{ url_for('report_view', standard_id=selected_standard.id) }}"
+             class="btn btn-outline-secondary btn-sm mt-2">
+            View Full Report
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suite siblings notice -->
+  {% if selected_suites %}
+  {% for suite in selected_suites %}
+  {% set siblings = suite.members | selectattr('standard_id', 'ne', selected_standard.id) | list %}
+  {% if siblings %}
+  <div class="alert border-0 mb-3 py-2 px-3"
+       style="background: linear-gradient(90deg, {{ suite.color }}18, #fff);
+              border-left: 4px solid {{ suite.color }} !important;">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <strong style="color:{{ suite.color }}; font-size:0.85rem;">
+          &#9664; {{ suite.name }}
+        </strong>
+        <span class="text-muted ms-2" style="font-size:0.82rem;">
+          {{ selected_standard.name }} is typically used together with:
+          {% for sib in siblings %}
+          <strong>{{ sib.standard_id | upper | replace('_',' ') }}</strong>
+          <span class="badge ms-1"
+                style="font-size:0.65rem; background:
+                  {% if sib.relationship == 'requires' %}#dc3545
+                  {% elif sib.relationship == 'extends' %}#0d6efd
+                  {% else %}#198754{% endif %}; color:#fff;">
+            {{ sib.relationship }}
+          </span>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </span>
+      </div>
+      <a href="{{ url_for('suite_view', suite_id=suite.id) }}"
+         class="btn btn-sm text-white text-decoration-none"
+         style="background:{{ suite.color }}; font-size:0.75rem; padding:0.2rem 0.6rem;">
+        View Suite
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% endif %}
+
+  {% if generated_json %}
+  <!-- Output panels side by side -->
+  <div class="row g-4">
+
+    <!-- JSON output -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold">
+            <span class="badge bg-warning text-dark me-2">JSON</span>
+            Generated Metadata
+          </h6>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="copyToClipboard('jsonOutput', this)">
+              Copy
+            </button>
+            <form method="POST" action="{{ url_for('download_json') }}" style="display:inline">
+              <input type="hidden" name="json_content" value="{{ generated_json | e }}">
+              <input type="hidden" name="standard_id" value="{{ selected_standard.id if selected_standard else 'metadata' }}">
+              <button type="submit" class="btn btn-sm btn-warning">
+                Download JSON
+              </button>
+            </form>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <pre id="jsonOutput" class="code-output m-0 p-3"><code class="language-json">{{ generated_json }}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- XML output -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold">
+            <span class="badge bg-info text-dark me-2">XML</span>
+            Generated Metadata
+          </h6>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="copyToClipboard('xmlOutput', this)">
+              Copy
+            </button>
+            <form method="POST" action="{{ url_for('download_xml') }}" style="display:inline">
+              <input type="hidden" name="xml_content" value="{{ generated_xml | e }}">
+              <input type="hidden" name="standard_id" value="{{ selected_standard.id if selected_standard else 'metadata' }}">
+              <button type="submit" class="btn btn-sm btn-info">
+                Download XML
+              </button>
+            </form>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <pre id="xmlOutput" class="code-output m-0 p-3"><code class="language-xml">{{ generated_xml }}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Field reference table -->
+  {% if selected_standard %}
+  <div class="card shadow-sm mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold">Field Reference — {{ selected_standard.name }}</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#fieldRefTable">
+        Toggle
+      </button>
+    </div>
+    <div class="collapse show" id="fieldRefTable">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Field</th>
+              <th>Obligation</th>
+              <th>Layer/Group</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fname, fdef in selected_standard.fields.items() %}
+            <tr class="
+              {% if fdef.obligation.value == 'Mandatory' %}table-danger-light
+              {% elif fdef.obligation.value == 'Conditional' %}table-warning-light
+              {% endif %}">
+              <td>
+                <code class="small fw-bold">{{ fdef.name }}</code>
+              </td>
+              <td>
+                <span class="badge
+                  {% if fdef.obligation.value == 'Mandatory' %}bg-danger
+                  {% elif fdef.obligation.value == 'Conditional' %}bg-warning text-dark
+                  {% else %}bg-secondary{% endif %}"
+                  style="font-size:0.65rem">
+                  {{ fdef.obligation.value }}
+                </span>
+              </td>
+              <td>
+                <small class="text-muted">
+                  {{ fdef.layer }}{% if fdef.group %}/{{ fdef.group }}{% endif %}
+                </small>
+              </td>
+              <td>
+                <code class="small text-muted">{{ fdef.representation_term.value }}</code>
+              </td>
+              <td>
+                <small>{{ fdef.description[:120] }}{% if fdef.description|length > 120 %}…{% endif %}</small>
+              </td>
+              <td>
+                <small class="text-muted">{{ fdef.reference }}</small>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Use in detect tool -->
+  <div class="alert alert-info mt-4 d-flex align-items-center gap-3">
+    <div class="fs-4">&#128161;</div>
+    <div>
+      <strong>Tip:</strong> Copy the generated JSON above and paste it into the
+      <a href="{{ url_for('detect_view') }}">Detect Standard</a> tool to verify it
+      is correctly identified as <strong>{{ selected_standard.name }}</strong>.
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function copyToClipboard(elementId, btn) {
+  const el = document.getElementById(elementId);
+  const text = el.innerText || el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-secondary');
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-outline-secondary');
+    }, 1500);
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+</script>
+{% endblock %}
