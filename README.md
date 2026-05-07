@@ -1,4 +1,4 @@
-# NATO Metadata Standards Comparison Tool
+# Metadata Standards Comparison Tool
 
 A local web application for detecting, generating, and comparing metadata standards used across NATO, EU, ISO, and NIST environments. Runs entirely offline (after the first page load caches CDN assets).
 
