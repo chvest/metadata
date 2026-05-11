@@ -82,6 +82,7 @@
         <li><a href="#sec-evidence">Evidence basis</a></li>
         <li><a href="#sec-limitations">Limitations</a></li>
         <li><a href="#sec-replication">Replication guide</a></li>
+        <li><a href="#sec-haslhofer">Grounding in Haslhofer &amp; Klas (2010)</a></li>
         <li><a href="#sec-literature">Related academic literature</a></li>
       </ol>
     </div>
@@ -591,9 +592,480 @@
     </div>
   </div>
 
-  {# ═══════════════════ 11. RELATED ACADEMIC LITERATURE ═══════════════════ #}
+  {# ═══════════════════ 11. HASLHOFER & KLAS ═══════════════════ #}
+  <div class="method-section" id="sec-haslhofer">
+    <h3>11. Conceptual grounding in Haslhofer &amp; Klas (2010)</h3>
+    <p>
+      Haslhofer, B. &amp; Klas, W. (2010). <em>A Survey of Techniques for Achieving Metadata Interoperability.</em>
+      ACM Computing Surveys, 42(2), Article 7.
+      DOI: <a href="https://doi.org/10.1145/1667062.1667064" target="_blank" rel="noopener">10.1145/1667062.1667064</a>
+    </p>
+    <p>
+      This survey provides the most comprehensive taxonomy of metadata interoperability techniques
+      available in the literature and is the primary theoretical reference for the approach taken
+      in this tool. The section below maps each major tool concept to a corresponding concept
+      in the paper, including the supporting papers Haslhofer &amp; Klas themselves cite.
+    </p>
+
+    {# ── 11.1 Where the tool sits in the taxonomy ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.1 Where the tool sits in the Haslhofer &amp; Klas taxonomy</h5>
+    <p>
+      The paper organises interoperability techniques into three top-level categories (Table II):
+      <em>model agreement</em> (adopting a single shared standard),
+      <em>metamodel agreement</em> (aligning through a common abstract model), and
+      <em>model reconciliation</em> (mapping between heterogeneous models without forcing convergence).
+    </p>
+    <p>
+      This tool implements the <strong>schema mapping</strong> branch of model reconciliation
+      (Section 4.3.2). The paper defines a schema mapping — called a <em>crosswalk</em> in the
+      library science community — as a mapping of the elements, semantics, and syntax from one
+      metadata schema to another. It notes that in practice crosswalks typically cover only the
+      M1 schema level and leave instance transformation to application developers. The tool
+      follows exactly this pattern: it maps fields between standards and annotates semantic
+      relationships, but does not execute runtime value transformation.
+    </p>
+    <div class="callout callout-info">
+      The paper's assertion that schema mapping is <em>"powerful enough to produce the same
+      interoperability quality as model agreement techniques"</em> (Section 5.3) supports the
+      tool's design choice to pursue crosswalks rather than proposing a common NATO/EU/ISO
+      metadata standard. In open multi-community environments — which both NATO and EU data
+      sharing represent — model agreement is rarely achievable.
+    </div>
+
+    {# ── 11.2 The M0 / M1 / M2 model and the tool's scope ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.2 The M0/M1/M2 abstraction levels</h5>
+    <p>
+      A central organising framework in the paper is a three-level abstraction
+      derived from the OMG Meta-Object Facility (Section 2.3.1):
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr><th style="width:10%">Level</th><th style="width:30%">In Haslhofer &amp; Klas</th><th>In this tool</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>M2</strong></td>
+          <td>Schema definition language (XML Schema, OWL, SQL-DDL, …)</td>
+          <td>Out of scope. The tool treats all standards as if expressed in a common
+              abstract language; language-level mismatches are noted in conflict descriptions
+              but not formally analysed.</td>
+        </tr>
+        <tr>
+          <td><strong>M1</strong></td>
+          <td>Metadata schema — the set of named elements and their semantic definitions</td>
+          <td><strong>Primary scope.</strong> Every crosswalk entry, conflict, score, and verdict
+              operates at this level: comparing field names, semantic definitions, obligation
+              constraints, and cardinality rules between schemas.</td>
+        </tr>
+        <tr>
+          <td><strong>M0</strong></td>
+          <td>Metadata instance — the actual content values in a record</td>
+          <td>Partially covered. <code>vocabulary</code> and <code>transform required</code>
+              conflicts flag known M0 incompatibilities (e.g. NATO ISO 639-3 codes vs.
+              EU Language NAL URIs), but the tool does not execute instance transformations
+              or validate specific content values.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p>
+      This means the tool's output is what Haslhofer &amp; Klas call a
+      <strong>partial crosswalk</strong> — it fully specifies the M1 semantic mapping
+      but leaves M0 instance transformation to implementers. The paper explicitly
+      identifies this as the most common real-world form of crosswalk (Section 4.3.2).
+    </p>
+
+    {# ── 11.3 Mapping expressions ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.3 Mapping expressions</h5>
+    <p>
+      The paper formalises four types of mapping expression in Definition 3 and Section 4.4.1,
+      originally drawn from
+      Spaccapietra, S., Parent, C. &amp; Dupont, Y. (1992). <em>Model Independent Assertions for
+      Integration of Heterogeneous Schemas.</em> VLDB Journal, 1(1), 81–126:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr>
+          <th style="width:22%">Haslhofer &amp; Klas<br><small class="fw-normal text-muted">(Spaccapietra et al.)</small></th>
+          <th style="width:32%">Formal meaning</th>
+          <th style="width:20%">This tool</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Equivalent</strong> <code>I(es) ≡ I(et)</code></td>
+          <td>The interpretations of two schema elements are semantically equivalent</td>
+          <td><span class="mapping-exact">exact</span></td>
+          <td>Direct semantic and structural equivalence; value can be transferred without modification</td>
+        </tr>
+        <tr>
+          <td><strong>Include</strong> <code>I(es) ⊆ I(et)</code></td>
+          <td>The interpretation of one element subsumes the other (one is broader)</td>
+          <td><span class="mapping-similar">similar</span> or <span class="mapping-partial">partial</span></td>
+          <td><em>Similar</em> when the broader field still captures the essential information;
+              <em>partial</em> when the target is so general that precision is lost
+              (e.g. multiple typed dates collapsing into a single <code>dc:date</code>)</td>
+        </tr>
+        <tr>
+          <td><strong>Overlap</strong> <code>I(es) ∩ I(et) ≠ ∅</code></td>
+          <td>The interpretations partially overlap but neither subsumes the other</td>
+          <td><span class="mapping-partial">partial</span></td>
+          <td>Both fields cover the same broad concept but with different scope or emphasis</td>
+        </tr>
+        <tr>
+          <td><strong>Exclude</strong> <code>I(es) ∩ I(et) = ∅</code></td>
+          <td>The interpretations are disjoint — no semantic correspondence</td>
+          <td><span class="mapping-none">none</span></td>
+          <td>No equivalent field exists; the source concept has no home in the target namespace</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p>
+      The tool's four mapping types are a direct operational instantiation of this
+      theoretical hierarchy. The main simplification is that <em>Include</em> is split
+      into two practical grades (<em>similar</em> vs <em>partial</em>) to distinguish
+      cases where the broader field is sufficient for most purposes from cases where
+      significant precision is demonstrably lost.
+    </p>
+
+    {# ── 11.4 Heterogeneity types and conflict categories ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.4 Heterogeneity types and conflict categories</h5>
+    <p>
+      Section 3.2 of the paper gives a systematic taxonomy of heterogeneities that impede
+      interoperability, divided between the schema (M1) and instance (M0) levels, and between
+      structural and semantic types. The tool's conflict categories correspond as follows:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr>
+          <th style="width:30%">Haslhofer &amp; Klas heterogeneity type</th>
+          <th style="width:25%">Tool conflict type</th>
+          <th>Example in this tool</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Naming conflict</strong> (M1) — same concept, different element names</td>
+          <td><em>Captured in crosswalk notes; no dedicated conflict type</em></td>
+          <td>ADatP-5636 <code>creator</code> ↔ Dublin Core <code>dc:creator</code>
+              (<em>exact</em> mapping — name differs but meaning is identical)</td>
+        </tr>
+        <tr>
+          <td><strong>Constraints conflict</strong> (M1) — incompatible obligation or cardinality</td>
+          <td><code>obligation_inversion</code>, <code>mandatory_gap</code></td>
+          <td>Dublin Core <code>dc:title</code> is mandatory; ADatP-5636 <code>title</code>
+              is also mandatory → compatible; but <code>dct:description</code> is mandatory
+              in DCAT-AP-SE while optional in ADatP-5636 → obligation inversion</td>
+        </tr>
+        <tr>
+          <td><strong>Abstraction-level incompatibility</strong> (M1) — same concept modelled
+              differently (attribute vs entity, flat vs structured)</td>
+          <td><code>structural</code></td>
+          <td>ADatP-5636 <code>originatorConfidentialityLabel</code> is a multi-layer
+              structured classification object; no equivalent structural construct exists in
+              Dublin Core or DCAT-AP</td>
+        </tr>
+        <tr>
+          <td><strong>Multilateral correspondence</strong> (M1) — 1:n or n:1 element relationships</td>
+          <td><em>partial</em> mapping type; noted in crosswalk entry</td>
+          <td>ADatP-5636 has eight typed date fields
+              (<code>dateCreated</code>, <code>dateIssued</code>, …);
+              Dublin Core has one generic <code>dc:date</code></td>
+        </tr>
+        <tr>
+          <td><strong>Domain coverage conflict</strong> (M1) — concept in one model
+              entirely absent from the other</td>
+          <td><em>none</em> mapping type; <code>mandatory_gap</code> if mandatory</td>
+          <td>ADatP-5636 <code>metadataConfidentialityLabel</code>,
+              <code>contextActivity</code>, <code>recordsHold</code> have no equivalent
+              in any civil standard covered here</td>
+        </tr>
+        <tr>
+          <td><strong>Terminological mismatch</strong> (M1) — synonym or homonym conflicts</td>
+          <td><code>domain_mismatch</code></td>
+          <td>ADatP-5636 <code>type</code> (resource genre) and NIST SP 800-60
+              <code>informationType</code> (security data category) share a name but
+              have incompatible semantics</td>
+        </tr>
+        <tr>
+          <td><strong>Scaling / unit conflict</strong> (M0) — same concept, different measurement units</td>
+          <td><code>vocabulary</code> + <em>transform required</em> severity</td>
+          <td>ADatP-5636 <code>language</code> uses ISO 639-3 alpha-3 codes;
+              DCAT-AP requires EU Language NAL URIs — same concept, incompatible
+              controlled vocabularies</td>
+        </tr>
+        <tr>
+          <td><strong>Representation conflict</strong> (M0) — same value, different encoding</td>
+          <td><code>vocabulary</code> or crosswalk note</td>
+          <td>Date encoding differences (ISO 8601 variants) noted in crosswalk
+              entry notes where applicable</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    {# ── 11.5 Bidirectionality ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.5 Directionality of mappings</h5>
+    <p>
+      Definition 3 in the paper explicitly defines a metadata mapping as a
+      <em>directional relationship</em> between a source schema and a target schema. It
+      further establishes that a reverse mapping is a distinct specification, not a mechanical
+      inversion of the forward one.
+    </p>
+    <p>
+      The tool follows this directly. Every crosswalk entry names a
+      <code>source_standard</code> and a <code>target_standard</code>; A→B and B→A are
+      stored and computed independently. The asymmetric compatibility scores that result
+      (often, a simpler standard scores higher when <em>sending to</em> a richer one than
+      when <em>receiving from</em> it) are a direct consequence of this theoretical property.
+    </p>
+
+    {# ── 11.6 Round-trip fidelity ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.6 Round-trip fidelity</h5>
+    <p>
+      The paper discusses cardinality of mapping elements — 1:1, 1:n, n:1 — and notes that
+      m:n correspondences can be decomposed into multiple 1:n and n:1 relationships
+      (Section 4.4.1). Round-trip fidelity is not analysed explicitly in the paper, but
+      it follows as a natural consequence of composing two directional mappings:
+      applying A→B then B→A traces the cardinality chain for each field and accumulates
+      degradation at each step.
+    </p>
+    <p>
+      The tool's round-trip fidelity score (Section 6 above) formalises this: a field
+      that passes through two <em>exact</em> legs is marked <strong>Survives</strong>;
+      a field passing through at least one <em>partial</em> leg is <strong>Degraded</strong>;
+      a field with a <em>none</em> leg or missing reverse is <strong>Lost</strong>.
+      This corresponds directly to the information-loss characterisation the paper
+      associates with 1:n and n:1 mappings.
+    </p>
+
+    {# ── 11.7 Mapping phases ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.7 The four mapping phases</h5>
+    <p>
+      Section 4.4.2 identifies a four-phase mapping lifecycle: discovery, representation,
+      execution, and maintenance. The tool covers three of the four:
+    </p>
+    <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered" style="font-size:0.88rem;">
+      <thead class="table-light">
+        <tr><th style="width:25%">Phase</th><th style="width:35%">Haslhofer &amp; Klas</th><th>In this tool</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Discovery</strong></td>
+          <td>Finding semantic and structural relationships between fields; requires deep domain
+              knowledge; can be supported by (semi-)automatic matching tools
+              <small class="text-muted">[Rahm &amp; Bernstein 2001; Kalfoglou &amp; Schorlemmer 2003]</small></td>
+          <td>Manual. Each crosswalk entry was built by reading the normative text of both
+              standards and applying the mapping expression criteria (Section 2 above).
+              No automated schema matching was used.</td>
+        </tr>
+        <tr>
+          <td><strong>Representation</strong></td>
+          <td>Formal declaration of mapping relationships. Noy (2004) identifies three options:
+              instances of a mapping model, bridging axioms/rules, or views.</td>
+          <td>Mapping-model instances. Each crosswalk entry is a <code>CrosswalkEntry</code>
+              dataclass — a structured record of source standard, source field, target standard,
+              target field, mapping type, and notes. The collection of all entries forms the
+              mapping specification.</td>
+        </tr>
+        <tr>
+          <td><strong>Execution</strong></td>
+          <td>Running the mapping at runtime for transformation, query answering, or transparent access</td>
+          <td>Partially covered. The tool executes mappings at read time to compute scores,
+              verdicts, round-trip fidelity, and conversion paths. It does not transform actual
+              metadata records (M0 instance transformation is out of scope).</td>
+        </tr>
+        <tr>
+          <td><strong>Maintenance</strong></td>
+          <td>Versioning, registry, and derivation of new mappings from existing ones
+              (transitive composition)</td>
+          <td>Managed via source control. The tool does not automatically derive transitive
+              mappings (A→C from A→B and B→C), though the conversion path analysis
+              (Section 7 above) manually enumerates two-hop routes and computes their
+              bottleneck scores.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    {# ── 11.8 Quality of interoperability ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.8 Quality of interoperability (Table V)</h5>
+    <p>
+      Section 5 and Table V of the paper provide a structured analysis of which heterogeneity
+      types each technique category can resolve. The paper's conclusion — that schema mapping
+      combined with instance transformation can address all types of structural and semantic
+      heterogeneity — is the theoretical justification for the tool's design goal: to surface
+      both schema-level gaps (<em>none</em> mappings, <code>mandatory_gap</code> conflicts)
+      and instance-level problems (<code>vocabulary</code> conflicts, <em>transform required</em>
+      severity) in a single view, even though the tool itself only executes at M1.
+    </p>
+    <p>
+      The tool's five-tier interoperability verdict ("Designed to work together" → "Not fully
+      interoperable") is an operationalisation of the paper's quality framework, applied to
+      specific standard pairs rather than to technique categories in the abstract.
+    </p>
+
+    {# ── 11.9 Where the tool diverges ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.9 Where the tool diverges from the paper</h5>
+    <ul style="font-size:0.9rem;">
+      <li>
+        <strong>Conflict severity typing</strong> (blocking / lossy / transform required) is
+        not part of the Haslhofer &amp; Klas framework. It is a practical extension that
+        distinguishes consequences: a blocking conflict prevents conformant conversion
+        entirely; a lossy conflict allows conversion but with permanent information loss;
+        a transform-required conflict is fully reversible given a correctly implemented
+        transformation.
+      </li>
+      <li>
+        <strong>Transitive mapping derivation</strong> is described in the paper as a
+        maintenance-phase capability: if A→B and B→C mappings exist, A→C can be derived.
+        The tool does not automatically materialise these derived mappings; it enumerates
+        two-hop paths and scores them by the weakest leg, but does not store the inferred
+        A→C crosswalk.
+      </li>
+      <li>
+        <strong>Automated schema matching</strong> — cited in the paper as a way to support
+        the discovery phase (Rahm &amp; Bernstein 2001 list name-based, structure-based, and
+        semantic matching strategies) — was not used. All entries were written by human
+        domain experts from the normative standard texts. This is the higher-cost, higher-fidelity
+        end of the discovery spectrum the paper describes.
+      </li>
+    </ul>
+
+    {# ── Supporting papers ── #}
+    <h5 class="fw-semibold mt-4" style="font-size:0.95rem;">11.10 Supporting papers cited in Haslhofer &amp; Klas</h5>
+    <p class="small text-muted mb-3">
+      The following papers are cited in the survey and are directly relevant to specific
+      aspects of this tool's methodology.
+    </p>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-semibold" style="font-size:0.9rem;">
+          Rahm, E. &amp; Bernstein, P.A. (2001). A Survey of Approaches to Automatic Schema Matching.
+        </div>
+        <div class="text-muted small mt-1">
+          <em>VLDB Journal</em>, 10(4), 334–350. &nbsp;·&nbsp;
+          DOI: <a href="https://doi.org/10.1007/s007780100057" target="_blank" rel="noopener">10.1007/s007780100057</a>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          The foundational survey of mapping <em>discovery</em> techniques, cited by
+          Haslhofer &amp; Klas as the reference for finding semantic and structural
+          relationships between schema elements. Catalogues strategies ranging from purely
+          name-based matching, through structure-based approaches (using the schema graph),
+          to constraint-based and semantic approaches. This tool uses the most labour-intensive
+          but highest-fidelity option: direct reading of normative standard documents by
+          domain experts. Rahm &amp; Bernstein's framework confirms this as a valid (if
+          costly) discovery strategy and explains why the alternative — automated matching
+          — would be unsuitable for standards as semantically specialised as ADatP-5636.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-semibold" style="font-size:0.9rem;">
+          Spaccapietra, S., Parent, C. &amp; Dupont, Y. (1992). Model Independent Assertions for
+          Integration of Heterogeneous Schemas.
+        </div>
+        <div class="text-muted small mt-1">
+          <em>VLDB Journal</em>, 1(1), 81–126.
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Introduced the four mapping expression types — Equivalent, Include, Overlap,
+          Exclude — that Haslhofer &amp; Klas formalise in Definition 3 and that this
+          tool implements as the <span class="mapping-exact">exact</span> /
+          <span class="mapping-similar">similar</span> /
+          <span class="mapping-partial">partial</span> /
+          <span class="mapping-none">none</span> scale (see Section 11.3 above).
+          The original paper established these as the minimal set of assertions needed
+          to represent any inter-schema semantic correspondence, and this claim has
+          held up in subsequent survey literature.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-semibold" style="font-size:0.9rem;">
+          Noy, N.F. (2004). Semantic Integration: A Survey of Ontology-Based Approaches.
+        </div>
+        <div class="text-muted small mt-1">
+          <em>ACM SIGMOD Record</em>, 33(4), 65–70. &nbsp;·&nbsp;
+          DOI: <a href="https://doi.org/10.1145/1041410.1041421" target="_blank" rel="noopener">10.1145/1041410.1041421</a>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Cited by Haslhofer &amp; Klas for the three formalisms available for
+          <em>representing</em> mapping relationships: (i) instances of a defined mapping
+          model, (ii) bridging axioms or rules, (iii) views over source schemas.
+          This tool uses approach (i): each crosswalk entry is an instance of a
+          <code>CrosswalkEntry</code> dataclass, and the set of all entries constitutes the
+          mapping model. Approach (ii) would require a formal rule engine; approach (iii)
+          is more appropriate for query-rewriting systems than for the scoring and analysis
+          use case here.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-semibold" style="font-size:0.9rem;">
+          Kalfoglou, Y. &amp; Schorlemmer, M. (2003). Ontology Mapping: The State of the Art.
+        </div>
+        <div class="text-muted small mt-1">
+          <em>The Knowledge Engineering Review</em>, 18(1), 1–31. &nbsp;·&nbsp;
+          DOI: <a href="https://doi.org/10.1017/S0269888903000651" target="_blank" rel="noopener">10.1017/S0269888903000651</a>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Cited alongside Rahm &amp; Bernstein for mapping discovery techniques.
+          The paper surveys ontology mapping approaches — ranging from manual expert-based
+          mapping to fully automated tools — and analyses their fitness for different
+          integration scenarios. Relevant here for the distinction between
+          <em>schema-level</em> mapping (what this tool does) and
+          <em>instance-level</em> mapping: the authors note that most tools operate at the
+          schema level and that instance-level alignment (ensuring specific values, not just
+          field names, are compatible) remains the harder unsolved problem — which is
+          consistent with this tool's treatment of vocabulary conflicts as a distinct, flagged
+          category rather than an automatically resolved one.
+        </p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-semibold" style="font-size:0.9rem;">
+          Pierre, M.S. &amp; LaPlant, W.P. (1998). Issues in Crosswalking Content Metadata Standards.
+        </div>
+        <div class="text-muted small mt-1">
+          National Information Standards Organization (NISO), October 1998. &nbsp;·&nbsp;
+          <a href="https://www.niso.org/publications/crosswalking-content-metadata-standards"
+             target="_blank" rel="noopener">NISO</a>
+        </div>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;color:#495057;">
+          Provides the formal definition of a crosswalk used by Haslhofer &amp; Klas and
+          widely adopted in the library science community: a crosswalk is a mapping of the
+          elements, semantics, and syntax from one metadata schema to another, with the goal
+          of enabling elements defined in one standard to be made available to communities
+          using related standards. The paper distinguishes a <em>complete crosswalk</em>
+          (covering both semantic mapping and instance transformation) from a
+          <em>partial crosswalk</em> (semantic mapping only). This tool implements a partial
+          crosswalk in Pierre &amp; LaPlant's sense — it fully specifies the M1 semantic
+          mapping but defers M0 instance transformation to application developers.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  {# ═══════════════════ 12. RELATED ACADEMIC LITERATURE ═══════════════════ #}
   <div class="method-section" id="sec-literature">
-    <h3>11. Related academic literature</h3>
+    <h3>12. Related academic literature</h3>
     <p>
       The following peer-reviewed publications address metadata standard comparison,
       crosswalk methodology, and interoperability in ways that are directly relevant to
