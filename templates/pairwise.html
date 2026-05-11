@@ -4,38 +4,124 @@
   — NATO Metadata Tool
 {% endblock %}
 
-{# ── Macro: mapping table (defined before use) ───────────────────────────── #}
-{% macro mapping_table(entries, src, tgt) %}
+{# ── Macro: full field coverage table ────────────────────────────────────── #}
+{#
+   Shows ALL fields from both standards in one table:
+     • Source fields with a crosswalk mapping  (row_type="mapped")
+     • Source fields with no mapping at all    (row_type="source_only")
+     • Target fields never reached by source   (row_type="target_only")
+   A separator row visually divides the source section from the target-only section.
+#}
+{% macro full_mapping_table(entries, src, tgt) %}
+{%- set ns = namespace(seen_target=false) -%}
+{%- set mapped_rows     = entries | selectattr('row_type', 'equalto', 'mapped') | list -%}
+{%- set src_only_rows   = entries | selectattr('row_type', 'equalto', 'source_only') | list -%}
+{%- set tgt_only_rows   = entries | selectattr('row_type', 'equalto', 'target_only') | list -%}
+{%- set mapped_real     = mapped_rows | rejectattr('mapping_type', 'equalto', 'none') | list -%}
+{%- set mapped_none     = mapped_rows | selectattr('mapping_type', 'equalto', 'none') | list -%}
+{%- set n_mapped        = mapped_real | length -%}
+{%- set n_no_equiv      = (mapped_none | length) + (src_only_rows | length) -%}
+{%- set n_tgt_only      = tgt_only_rows | length -%}
+{%- set n_src_total     = (mapped_rows | length) + (src_only_rows | length) -%}
+{%- set n_tgt_total     = (mapped_real | length) + (n_tgt_only) -%}
+
+{# ── Summary bar ── #}
+<div class="px-3 pt-3 pb-2 d-flex flex-wrap gap-2 align-items-center"
+     style="border-bottom:1px solid var(--bs-border-color);">
+  <span class="fw-semibold small text-muted me-1">{{ src.name }}:</span>
+  <span class="badge" style="background:#198754;color:#fff;">&#10003; {{ n_mapped }} mapped</span>
+  {% if n_no_equiv %}
+  <span class="badge" style="background:#dc3545;color:#fff;">&#10007; {{ n_no_equiv }} no equivalent in {{ tgt.name }}</span>
+  {% endif %}
+  <span class="ms-3 fw-semibold small text-muted me-1">{{ tgt.name }}:</span>
+  <span class="badge" style="background:#0d6efd;color:#fff;">{{ n_mapped }} field{{ 's' if n_mapped != 1 }} covered</span>
+  {% if n_tgt_only %}
+  <span class="badge" style="background:#6c757d;color:#fff;">{{ n_tgt_only }} not reached from {{ src.name }}</span>
+  {% endif %}
+</div>
+
+{# ── Legend ── #}
+<div class="px-3 py-2 d-flex flex-wrap gap-3 align-items-center"
+     style="font-size:0.78rem; border-bottom:1px solid var(--bs-border-color); background:var(--bs-tertiary-bg);">
+  <span class="fw-semibold text-muted">Legend:</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#d1e7dd;border:1px solid #badbcc;border-radius:2px;" class="me-1"></span>exact / similar / partial mapping</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#fff3cd;border:1px solid #ffe69c;border-radius:2px;" class="me-1"></span>no equivalent in {{ tgt.name }}</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#cff4fc;border:1px solid #9eeaf9;border-radius:2px;" class="me-1"></span>{{ tgt.name }} field not covered by {{ src.name }}</span>
+  <span><span class="badge bg-danger me-1" style="font-size:0.65rem;">M</span>mandatory field</span>
+</div>
+
 <div class="table-responsive">
 <table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
   <thead class="table-light">
     <tr>
-      <th style="width:26%">{{ src.name }} field</th>
-      <th style="width:26%">{{ tgt.name }} field</th>
-      <th style="width:10%">Mapping</th>
+      <th style="width:25%">{{ src.name }} field</th>
+      <th style="width:25%">{{ tgt.name }} field</th>
+      <th style="width:9%">Mapping</th>
       <th>Notes</th>
     </tr>
   </thead>
   <tbody>
     {% for e in entries %}
+
+    {# Separator before the first target-only row #}
+    {% if e.row_type == 'target_only' and not ns.seen_target %}
+    {%- set ns.seen_target = true -%}
     <tr>
+      <td colspan="4" class="table-secondary text-center fw-semibold small py-1"
+          style="border-top:2px solid var(--bs-border-color); letter-spacing:0.03em;">
+        &#11015; {{ tgt.name }} fields with no incoming mapping from {{ src.name }} ({{ n_tgt_only }})
+      </td>
+    </tr>
+    {% endif %}
+
+    {% if e.row_type == 'target_only' %}
+    {# ── Target-only row (blue tint) ── #}
+    <tr class="table-info">
+      <td><span class="text-muted fst-italic small">— not mapped from {{ src.name }} —</span></td>
+      <td>
+        <code>{{ e.target_field }}</code>
+        {% if e.target_obligation == 'Mandatory' %}<span class="badge bg-danger ms-1" style="font-size:0.65rem;">M</span>{% endif %}
+        {% if e.target_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.target_ref }}</span>{% endif %}
+      </td>
+      <td><span class="text-muted">—</span></td>
+      <td><small class="text-muted">{{ tgt.name }} field; no source mapping defined</small></td>
+    </tr>
+
+    {% elif e.mapping_type == 'none' or e.row_type == 'source_only' %}
+    {# ── Source field with no equivalent (yellow/amber tint) ── #}
+    <tr class="table-warning">
       <td>
         <code>{{ e.source_field }}</code>
+        {% if e.source_obligation == 'Mandatory' %}<span class="badge bg-danger ms-1" style="font-size:0.65rem;">M</span>{% endif %}
+        {% if e.source_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.source_ref }}</span>{% endif %}
+      </td>
+      <td><span class="text-muted fst-italic">No equivalent in {{ tgt.name }}</span></td>
+      <td><span class="mapping-none">none</span></td>
+      <td><small class="text-muted">{{ e.notes }}</small></td>
+    </tr>
+
+    {% else %}
+    {# ── Mapped row (default / light green tint for exact+similar) ── #}
+    <tr {% if e.mapping_type in ('exact', 'similar') %}class="table-success" style="--bs-table-bg-factor:0.25;"{% endif %}>
+      <td>
+        <code>{{ e.source_field }}</code>
+        {% if e.source_obligation == 'Mandatory' %}<span class="badge bg-danger ms-1" style="font-size:0.65rem;">M</span>{% endif %}
         {% if e.source_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.source_ref }}</span>{% endif %}
       </td>
       <td>
         {% if e.target_field %}
           <code>{{ e.target_field }}</code>
+          {% if e.target_obligation == 'Mandatory' %}<span class="badge bg-danger ms-1" style="font-size:0.65rem;">M</span>{% endif %}
           {% if e.target_ref %}<br><span class="text-muted" style="font-size:0.72rem;">&#128209; {{ e.target_ref }}</span>{% endif %}
         {% else %}
           <span class="text-muted">—</span>
         {% endif %}
       </td>
-      <td>
-        <span class="mapping-{{ e.mapping_type }}">{{ e.mapping_type }}</span>
-      </td>
+      <td><span class="mapping-{{ e.mapping_type }}">{{ e.mapping_type }}</span></td>
       <td><small class="text-muted">{{ e.notes }}</small></td>
     </tr>
+    {% endif %}
+
     {% endfor %}
   </tbody>
 </table>
@@ -533,16 +619,24 @@
   <div class="alert alert-success border-0 mb-4">&#10003; No interoperability conflicts identified in either direction.</div>
   {% endif %}
 
-  {# ── Field mapping table ──────────────────────────────────────────────── #}
-  {% set has_ab = data.all_mappings_ab | length > 0 %}
-  {% set has_ba = data.all_mappings_ba | length > 0 %}
+  {# ── Field coverage table ─────────────────────────────────────────────── #}
+  {# Shows ALL fields from both standards: mapped, unmapped source, and target-only #}
+  {% set has_ab = data.full_fields_ab | length > 0 %}
+  {% set has_ba = data.full_fields_ba | length > 0 %}
 
   {% if has_ab or has_ba %}
+  {%- set ab_mapped   = data.full_fields_ab | selectattr('row_type', 'equalto', 'mapped') | rejectattr('mapping_type', 'equalto', 'none') | list -%}
+  {%- set ba_mapped   = data.full_fields_ba | selectattr('row_type', 'equalto', 'mapped') | rejectattr('mapping_type', 'equalto', 'none') | list -%}
+  {%- set ab_src_tot  = data.full_fields_ab | rejectattr('row_type', 'equalto', 'target_only') | list | length -%}
+  {%- set ba_src_tot  = data.full_fields_ba | rejectattr('row_type', 'equalto', 'target_only') | list | length -%}
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-header sec-toggle d-flex justify-content-between align-items-center"
          data-bs-toggle="collapse" data-bs-target="#sec-fields"
          aria-expanded="true">
-      <h5 class="mb-0">Field Mappings</h5>
+      <h5 class="mb-0">
+        Field Coverage
+        <span class="fw-normal small text-muted ms-2">All fields from both standards</span>
+      </h5>
       <span class="sec-chevron">&#9660;</span>
     </div>
     <div id="sec-fields" class="collapse show">
@@ -554,30 +648,28 @@
           <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ab">
               {{ data.std_a.name }} → {{ data.std_b.name }}
-              <span class="badge bg-secondary ms-1">{{ data.all_mappings_ab | length }}</span>
+              <span class="badge bg-secondary ms-1">{{ ab_mapped | length }}/{{ ab_src_tot }}</span>
             </button>
           </li>
           <li class="nav-item">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ba">
               {{ data.std_b.name }} → {{ data.std_a.name }}
-              <span class="badge bg-secondary ms-1">{{ data.all_mappings_ba | length }}</span>
+              <span class="badge bg-secondary ms-1">{{ ba_mapped | length }}/{{ ba_src_tot }}</span>
             </button>
           </li>
         </ul>
         <div class="tab-content">
           <div class="tab-pane fade show active p-0" id="tab-ab">
-            {{ mapping_table(data.all_mappings_ab, data.std_a, data.std_b) }}
+            {{ full_mapping_table(data.full_fields_ab, data.std_a, data.std_b) }}
           </div>
           <div class="tab-pane fade p-0" id="tab-ba">
-            {{ mapping_table(data.all_mappings_ba, data.std_b, data.std_a) }}
+            {{ full_mapping_table(data.full_fields_ba, data.std_b, data.std_a) }}
           </div>
         </div>
         {% elif has_ab %}
-          <div class="px-3 pt-2 pb-1 text-muted small">{{ data.std_a.name }} → {{ data.std_b.name }}</div>
-          {{ mapping_table(data.all_mappings_ab, data.std_a, data.std_b) }}
+          {{ full_mapping_table(data.full_fields_ab, data.std_a, data.std_b) }}
         {% else %}
-          <div class="px-3 pt-2 pb-1 text-muted small">{{ data.std_b.name }} → {{ data.std_a.name }}</div>
-          {{ mapping_table(data.all_mappings_ba, data.std_b, data.std_a) }}
+          {{ full_mapping_table(data.full_fields_ba, data.std_b, data.std_a) }}
         {% endif %}
 
       </div>

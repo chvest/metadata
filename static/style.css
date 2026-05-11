@@ -529,6 +529,11 @@ pre { white-space: pre-wrap; word-break: break-word; }
   border-color: #2d3748 !important;
 }
 
+/* ── Field coverage table legend swatches ───────────────────────────────── */
+/* success-subtle green (mapped rows legend) */
+[data-bs-theme="dark"] [style*="background:#d1e7dd"],
+[data-bs-theme="dark"] [style*="background: #d1e7dd"] { background: #0d2b1a !important; }
+
 /* ── Pairwise conflict card text ─────────────────────────────────────────── */
 /* Cards have dark backgrounds from the rules above but no explicit text colour */
 [data-bs-theme="dark"] .conflict-blocking,

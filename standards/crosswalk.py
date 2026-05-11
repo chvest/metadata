@@ -2354,6 +2354,76 @@ def build_pairwise_data(id_a: str, id_b: str) -> dict:
     enriched_ab = _enrich(all_ab, std_a, std_b)
     enriched_ba = _enrich(all_ba, std_b, std_a)
 
+    def _build_full_fields(enriched_entries, src_std, tgt_std):
+        """Unified field coverage list for one direction.
+
+        Produces rows for:
+        - Every source field: with its crosswalk entry (if one exists) or a
+          synthetic 'no entry' row (row_type='source_only')
+        - Every target field that receives no mapping from the source
+          (row_type='target_only')
+
+        This lets the UI show the complete picture of which fields are covered,
+        partially covered, or not covered at all in either direction.
+        """
+        cw_index = {e["source_field"]: e for e in enriched_entries}
+        mapped_tgt = {e["target_field"] for e in enriched_entries if e["target_field"]}
+        rows = []
+
+        # ── All source fields ──────────────────────────────────────────────
+        if src_std:
+            for fname, fdef in src_std.fields.items():
+                if fname in cw_index:
+                    e = cw_index[fname]
+                    tgt_obl = ""
+                    if tgt_std and e["target_field"] and e["target_field"] in tgt_std.fields:
+                        tgt_obl = tgt_std.fields[e["target_field"]].obligation.value
+                    rows.append({
+                        "row_type": "mapped",
+                        "source_field": fname,
+                        "source_ref": e["source_ref"],
+                        "source_obligation": fdef.obligation.value,
+                        "target_field": e["target_field"],
+                        "target_ref": e["target_ref"],
+                        "target_obligation": tgt_obl,
+                        "mapping_type": e["mapping_type"],
+                        "notes": e["notes"],
+                    })
+                else:
+                    # Source field exists but has no crosswalk entry at all
+                    rows.append({
+                        "row_type": "source_only",
+                        "source_field": fname,
+                        "source_ref": fdef.reference,
+                        "source_obligation": fdef.obligation.value,
+                        "target_field": None,
+                        "target_ref": "",
+                        "target_obligation": "",
+                        "mapping_type": "-",
+                        "notes": "No crosswalk entry defined",
+                    })
+
+        # ── Target fields that receive no mapping from source ──────────────
+        if tgt_std:
+            for fname, fdef in tgt_std.fields.items():
+                if fname not in mapped_tgt:
+                    rows.append({
+                        "row_type": "target_only",
+                        "source_field": None,
+                        "source_ref": "",
+                        "source_obligation": "",
+                        "target_field": fname,
+                        "target_ref": fdef.reference,
+                        "target_obligation": fdef.obligation.value,
+                        "mapping_type": "-",
+                        "notes": "No source mapping defined",
+                    })
+
+        return rows
+
+    full_fields_ab = _build_full_fields(enriched_ab, std_a, std_b)
+    full_fields_ba = _build_full_fields(enriched_ba, std_b, std_a)
+
     conflicts_ab = build_conflicts(id_a, id_b)
     conflicts_ba = build_conflicts(id_b, id_a)
 
@@ -2379,6 +2449,8 @@ def build_pairwise_data(id_a: str, id_b: str) -> dict:
         "mappings_ba": [e for e in enriched_ba if e["mapping_type"] != "none"],
         "all_mappings_ab": enriched_ab,
         "all_mappings_ba": enriched_ba,
+        "full_fields_ab": full_fields_ab,
+        "full_fields_ba": full_fields_ba,
         "verdict": verdict,
         "roundtrip_ab": compute_roundtrip(id_a, id_b),
         "roundtrip_ba": compute_roundtrip(id_b, id_a),
