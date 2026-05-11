@@ -1736,7 +1736,8 @@ def generate_pdf_report(standard_id: str, metadata: Optional[Dict[str, Any]] = N
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY))
     story.append(Paragraph(
         "NATO Metadata Standards Comparison Tool — "
-        "ADatP-5636 Ed.A V1 | Dublin Core | DCAT-AP | ISO 19115 | ISO 23081 | NIST SP 800-60/53",
+        "ADatP-5636 · ADatP-4774 · ADatP-4778 · Dublin Core · DCAT-AP · DCAT-AP-SE · "
+        "INSPIRE · ISO 19115-1 · ISO 23081-1 · NIST SP 800-60 · NIST IR 8112",
         caption_style,
     ))
 
